@@ -6,7 +6,8 @@ import { GoogleGenAI } from "@google/genai";
 import { initializeApp as initAdminApp, getApps as getAdminApps } from "firebase-admin/app";
 import { getAuth as getAdminAuth } from "firebase-admin/auth";
 import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
-import "dotenv/config";
+import dotenv from "dotenv";
+dotenv.config({ override: true });
 import { createClient } from "@supabase/supabase-js";
 
 // Initialize Supabase Client safely using environment variables
@@ -14,19 +15,8 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = (supabaseUrl && supabaseServiceKey) ? createClient(supabaseUrl, supabaseServiceKey) : null;
 
-// In-memory store fallback for Empresa Contratante
+// In-memory store fallback for Empresa Contratante (initialized empty to eliminate mock data as requested)
 const inMemoryContratantes = new Map<string, any>();
-inMemoryContratantes.set("CTR-2026-SYS", {
-  natureza: 'Publica',
-  nome: 'DER-SP - Departamento de Estradas de Rodagem do Estado de São Paulo',
-  area: 'Infraestrutura e Transportes Rodoviários',
-  departamento: 'Diretoria de Engenharia, Malha Viária e Gestão de Contratos',
-  cnpj: '43.050.494/0001-41',
-  email: 'diretoria.contratos@der.sp.gov.br',
-  telefone: '(11) 3311-1400',
-  gestorResponsavel: 'Dr. Fernando M. Siqueira',
-  unidadeAdministrativa: 'Sede Central - São Paulo/SP'
-});
 
 // Initialize Firebase Admin SDK safely with fs.readFileSync
 let configData: any = {};
@@ -710,19 +700,20 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
   // GET Empresa Contratante
   app.get("/api/contratante", async (req, res) => {
     const contrato_id = (req.query.contrato_id as string) || "CTR-2026-SYS";
+    const emptyTemplate = {
+      natureza: 'Publica',
+      nome: '',
+      area: '',
+      departamento: '',
+      cnpj: '',
+      email: '',
+      telefone: '',
+      gestorResponsavel: '',
+      unidadeAdministrativa: ''
+    };
     try {
       if (!supabase) {
-        const localData = inMemoryContratantes.get(contrato_id) || {
-          natureza: 'Publica',
-          nome: 'DER-SP - Departamento de Estradas de Rodagem do Estado de São Paulo',
-          area: 'Infraestrutura e Transportes Rodoviários',
-          departamento: 'Diretoria de Engenharia, Malha Viária e Gestão de Contratos',
-          cnpj: '43.050.494/0001-41',
-          email: 'diretoria.contratos@der.sp.gov.br',
-          telefone: '(11) 3311-1400',
-          gestorResponsavel: 'Dr. Fernando M. Siqueira',
-          unidadeAdministrativa: 'Sede Central - São Paulo/SP'
-        };
+        const localData = inMemoryContratantes.get(contrato_id) || emptyTemplate;
         return res.json({ success: true, data: localData, synced: false, error: "Credenciais do Supabase ausentes no arquivo .env." });
       }
 
@@ -733,51 +724,21 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
         .maybeSingle();
 
       if (error) {
-        console.warn(`Supabase fetch error for ${contrato_id}, using memory fallback:`, error.message);
-        const localData = inMemoryContratantes.get(contrato_id) || {
-          natureza: 'Publica',
-          nome: 'DER-SP - Departamento de Estradas de Rodagem do Estado de São Paulo',
-          area: 'Infraestrutura e Transportes Rodoviários',
-          departamento: 'Diretoria de Engenharia, Malha Viária e Gestão de Contratos',
-          cnpj: '43.050.494/0001-41',
-          email: 'diretoria.contratos@der.sp.gov.br',
-          telefone: '(11) 3311-1400',
-          gestorResponsavel: 'Dr. Fernando M. Siqueira',
-          unidadeAdministrativa: 'Sede Central - São Paulo/SP'
-        };
+        console.warn(`Supabase fetch error for ${contrato_id}, using empty memory template:`, error.message);
+        const localData = inMemoryContratantes.get(contrato_id) || emptyTemplate;
         return res.json({ success: true, data: localData, synced: false, error: error.message });
       }
 
       if (!data) {
-        // No record yet, return default
-        const localData = inMemoryContratantes.get(contrato_id) || {
-          natureza: 'Publica',
-          nome: 'DER-SP - Departamento de Estradas de Rodagem do Estado de São Paulo',
-          area: 'Infraestrutura e Transportes Rodoviários',
-          departamento: 'Diretoria de Engenharia, Malha Viária e Gestão de Contratos',
-          cnpj: '43.050.494/0001-41',
-          email: 'diretoria.contratos@der.sp.gov.br',
-          telefone: '(11) 3311-1400',
-          gestorResponsavel: 'Dr. Fernando M. Siqueira',
-          unidadeAdministrativa: 'Sede Central - São Paulo/SP'
-        };
-        return res.json({ success: true, data: localData, synced: true, info: "Default record served" });
+        // No record yet, return empty template
+        const localData = inMemoryContratantes.get(contrato_id) || emptyTemplate;
+        return res.json({ success: true, data: localData, synced: true, info: "Empty/New record served" });
       }
 
       return res.json({ success: true, data, synced: true });
     } catch (err: any) {
       console.error("GET /api/contratante unexpected error:", err);
-      const localData = inMemoryContratantes.get(contrato_id) || {
-        natureza: 'Publica',
-        nome: 'DER-SP - Departamento de Estradas de Rodagem do Estado de São Paulo',
-        area: 'Infraestrutura e Transportes Rodoviários',
-        departamento: 'Diretoria de Engenharia, Malha Viária e Gestão de Contratos',
-        cnpj: '43.050.494/0001-41',
-        email: 'diretoria.contratos@der.sp.gov.br',
-        telefone: '(11) 3311-1400',
-        gestorResponsavel: 'Dr. Fernando M. Siqueira',
-        unidadeAdministrativa: 'Sede Central - São Paulo/SP'
-      };
+      const localData = inMemoryContratantes.get(contrato_id) || emptyTemplate;
       return res.json({ success: true, data: localData, synced: false, error: err.message });
     }
   });

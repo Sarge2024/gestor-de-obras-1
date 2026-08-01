@@ -18,17 +18,17 @@ export const EmpresasView: React.FC<EmpresasViewProps> = ({ authSession, empresa
   // Sub-tabs in EmpresasView
   const [activeSubTab, setActiveSubTab] = useState<'CONTRATANTE' | 'LISTA'>('CONTRATANTE');
 
-  // Empresa Contratante (Proprietária) State
+  // Empresa Contratante (Proprietária) State - Initialized empty to eliminate mock data as requested
   const [empresaContratante, setEmpresaContratante] = useState({
     natureza: 'Publica' as 'Privada' | 'Publica', // Radiobutton inicial: Privada ou Publica
-    nome: 'DER-SP - Departamento de Estradas de Rodagem do Estado de São Paulo',
-    area: 'Infraestrutura e Transportes Rodoviários',
-    departamento: 'Diretoria de Engenharia, Malha Viária e Gestão de Contratos',
-    cnpj: '43.050.494/0001-41',
-    email: 'diretoria.contratos@der.sp.gov.br',
-    telefone: '(11) 3311-1400',
-    gestorResponsavel: 'Dr. Fernando M. Siqueira',
-    unidadeAdministrativa: 'Sede Central - São Paulo/SP'
+    nome: '',
+    area: '',
+    departamento: '',
+    cnpj: '',
+    email: '',
+    telefone: '',
+    gestorResponsavel: '',
+    unidadeAdministrativa: ''
   });
 
   const [isEditingContratante, setIsEditingContratante] = useState(false);
@@ -733,7 +733,15 @@ ALTER TABLE empresa_contratante DISABLE ROW LEVEL SECURITY;`}
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
                           Empresa Proprietária
                         </span>
-                        <h4 className="text-xl font-bold text-slate-800">{empresaContratante.nome}</h4>
+                        <h4 className="text-xl font-bold text-slate-800">
+                          {empresaContratante.nome || 'Nenhum cadastro de empresa contratante encontrado'}
+                        </h4>
+                        {!empresaContratante.nome && (
+                          <p className="text-xs text-amber-600 mt-1 flex items-center gap-1 font-medium">
+                            <span className="material-symbols-outlined text-sm">warning</span>
+                            Clique no botão "Editar Cadastro" acima para configurar a empresa contratante.
+                          </p>
+                        )}
                       </div>
 
                       <span
@@ -753,12 +761,12 @@ ALTER TABLE empresa_contratante DISABLE ROW LEVEL SECURITY;`}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-200 text-xs">
                       <div className="p-3 bg-white rounded-md border border-slate-200 shadow-2xs">
                         <span className="text-[10px] text-slate-400 font-bold uppercase block">Área</span>
-                        <span className="font-bold text-slate-800 text-sm mt-0.5 block">{empresaContratante.area}</span>
+                        <span className="font-bold text-slate-800 text-sm mt-0.5 block">{empresaContratante.area || 'Não cadastrado'}</span>
                       </div>
 
                       <div className="p-3 bg-white rounded-md border border-slate-200 shadow-2xs">
                         <span className="text-[10px] text-slate-400 font-bold uppercase block">Departamento</span>
-                        <span className="font-bold text-slate-800 text-sm mt-0.5 block">{empresaContratante.departamento}</span>
+                        <span className="font-bold text-slate-800 text-sm mt-0.5 block">{empresaContratante.departamento || 'Não cadastrado'}</span>
                       </div>
                     </div>
 
