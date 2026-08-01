@@ -41,7 +41,11 @@ export const FirestoreLancamentosTable: React.FC<FirestoreLancamentosTableProps>
     setLoading(true);
     try {
       const url = `/api/firestore/lancamentos?contrato_id=${contratoId}&fornecedor_id=${entidadeId}&perfil=${perfil}`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${currentSession?.idToken || ''}`
+        }
+      });
       if (res.ok) {
         const data = await res.json();
         setLancamentos(data.lancamentos || []);
@@ -84,7 +88,10 @@ export const FirestoreLancamentosTable: React.FC<FirestoreLancamentosTableProps>
 
       const res = await fetch('/api/firestore/lancamentos', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentSession?.idToken || ''}`
+        },
         body: JSON.stringify({
           contrato_id: contratoId,
           fornecedor_id: targetFornecedor,

@@ -45,7 +45,11 @@ export const EmpresasView: React.FC<EmpresasViewProps> = ({ authSession, empresa
     const fetchContratante = async () => {
       setSupabaseLoading(true);
       try {
-        const response = await fetch(`/api/contratante?contrato_id=${encodeURIComponent(contratoId)}`);
+        const response = await fetch(`/api/contratante?contrato_id=${encodeURIComponent(contratoId)}`, {
+          headers: {
+            'Authorization': `Bearer ${authSession?.idToken || ''}`
+          }
+        });
         const json = await response.json();
         if (json.success && json.data) {
           setEmpresaContratante(json.data);
@@ -71,7 +75,11 @@ export const EmpresasView: React.FC<EmpresasViewProps> = ({ authSession, empresa
   useEffect(() => {
     const fetchEmpresas = async () => {
       try {
-        const response = await fetch(`/api/empresas?contrato_id=${encodeURIComponent(contratoId)}`);
+        const response = await fetch(`/api/empresas?contrato_id=${encodeURIComponent(contratoId)}`, {
+          headers: {
+            'Authorization': `Bearer ${authSession?.idToken || ''}`
+          }
+        });
         const json = await response.json();
         if (json.success && json.data) {
           setEmpresas(json.data);
@@ -99,7 +107,10 @@ export const EmpresasView: React.FC<EmpresasViewProps> = ({ authSession, empresa
     try {
       const response = await fetch('/api/contratante', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authSession?.idToken || ''}`
+        },
         body: JSON.stringify({
           contrato_id: contratoId,
           ...tempContratante
@@ -256,7 +267,10 @@ export const EmpresasView: React.FC<EmpresasViewProps> = ({ authSession, empresa
     try {
       const response = await fetch('/api/empresas', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authSession?.idToken || ''}`
+        },
         body: JSON.stringify(payload)
       });
       const json = await response.json();
@@ -298,7 +312,10 @@ export const EmpresasView: React.FC<EmpresasViewProps> = ({ authSession, empresa
     setSupabaseLoading(true);
     try {
       const response = await fetch(`/api/empresas?id=${encodeURIComponent(companyId)}&contrato_id=${encodeURIComponent(contratoId)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${authSession?.idToken || ''}`
+        }
       });
       const json = await response.json();
 
@@ -328,7 +345,10 @@ export const EmpresasView: React.FC<EmpresasViewProps> = ({ authSession, empresa
     try {
       const response = await fetch('/api/empresas', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authSession?.idToken || ''}`
+        },
         body: JSON.stringify(updatedPayload)
       });
       const json = await response.json();

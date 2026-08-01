@@ -1,17 +1,14 @@
 export type NavigationTab = 'login' | 'dashboard' | 'financeiro' | 'contratos' | 'alertas' | 'onboarding' | 'auth-debug' | 'empresas' | 'entidades' | 'matriz-acesso' | 'usuarios';
 
-export interface EmpresaItem {
-  id: string;
-  nome: string;
-  cnpj_cpf: string;
-  tipo: 'FORNECEDOR' | 'CLIENTE' | 'PARCEIRO' | 'CONTRATANTE';
-  contrato_id: string;
-  emailContato: string;
-  telefone: string;
-  status: 'ATIVO' | 'BLOQUEADO' | 'EM_ANALISE';
-  totalFaturado: number;
-  createdAt: string;
-}
+// Re-exports dos tipos modularizados para manter compatibilidade com o frontend
+export type { FirebaseCustomClaims as CustomClaims } from './types/firebase.types';
+export type { FirebaseAuthSession as AuthSession } from './types/firebase.types';
+export type { FirebaseOnboardingInvite as OnboardingInvite } from './types/firebase.types';
+export type { CerneEmpresa as EmpresaItem } from './types/cerne.types';
+
+export * from './types/firebase.types';
+export * from './types/cerne.types';
+export * from './types/middleware.types';
 
 export interface UserRecord {
   id: string;
@@ -26,38 +23,6 @@ export interface UserRecord {
   createdAt: string;
 }
 
-export interface CustomClaims {
-  contrato_id: string; // Tenant principal (ex: CTR-2026-SYS)
-  empresa_id: string; // ID do fornecedor ou empresa (ex: SUP-9823-STORAGE)
-  entidade_id?: string; // Alias legado para empresa_id
-  perfil: 'FINANCEIRO' | 'FORNECEDOR' | 'GESTOR' | 'ADMIN'; // Perfil de acesso
-  mfa_verified?: boolean; // Duplo fator verificado
-}
-
-export interface AuthSession {
-  uid: string;
-  email: string;
-  displayName: string;
-  photoURL?: string;
-  customClaims: CustomClaims;
-  idToken: string;
-  mfaVerified: boolean;
-  mfaMethod?: 'EMAIL_OTP' | 'GOOGLE_2FA' | 'SMS_OTP';
-  lastLoginAt: string;
-}
-
-export interface OnboardingInvite {
-  id: string;
-  email: string;
-  contrato_id: string;
-  empresa_id: string;
-  entidade_id?: string;
-  perfil: 'FINANCEIRO' | 'FORNECEDOR' | 'GESTOR' | 'ADMIN';
-  inviteToken: string;
-  status: 'PENDENTE' | 'ACEITO' | 'EXPIRADO';
-  createdAt: string;
-  invitedBy?: string;
-}
 
 export interface UserProfile {
   name: string;

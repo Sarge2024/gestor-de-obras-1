@@ -1,0 +1,16 @@
+import { Request } from 'express';
+import { FirebaseCustomClaims } from './firebase.types';
+
+export interface DecodedFirebaseJWT {
+  uid: string;
+  email: string;
+  contrato_id: string;
+  empresa_id: string;
+  entidade_id?: string;
+  perfil: 'FINANCEIRO' | 'FORNECEDOR' | 'GESTOR' | 'ADMIN';
+  mfa_verified?: boolean;
+}
+
+export interface AuthenticatedRequest extends Request {
+  decodedToken?: DecodedFirebaseJWT;
+}

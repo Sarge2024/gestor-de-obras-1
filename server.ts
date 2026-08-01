@@ -8,14 +8,22 @@ import { getAuth as getAdminAuth } from "firebase-admin/auth";
 import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
 import dotenv from "dotenv";
 dotenv.config({ override: true });
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { verifyFirebaseJWT } from "./src/middleware/verifyFirebaseJWT";
+import { AuthenticatedRequest } from "./src/types/middleware.types";
+import { FirebaseCustomClaims } from "./src/types/firebase.types";
+
+// Check if Firebase Admin SDK has valid credentials to initialize Firestore
+const isFirestoreEnabled = () => {
+  return !!process.env.GOOGLE_APPLICATION_CREDENTIALS || fs.existsSync(path.join(process.cwd(), "serviceAccountKey.json"));
+};
 
 // Initialize Supabase Client safely using environment variables
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
-let supabase: any = null;
+let supabase: SupabaseClient | null = null;
 if (supabaseUrl) {
   // Use the verified valid Anon Key if the Service Role Key is known to be invalid or missing,
   // ensuring the server can successfully connect and query the database tables.
@@ -39,8 +47,18 @@ const inMemoryContratantes = new Map<string, any>();
 // In-memory store fallback for Empresas Fornecedoras (initialized empty to eliminate mock data as requested)
 const inMemoryEmpresas = new Map<string, any[]>();
 
+interface FirebaseAppConfig {
+  apiKey?: string;
+  authDomain?: string;
+  projectId?: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  appId?: string;
+  firestoreDatabaseId?: string;
+}
+
 // Initialize Firebase Admin SDK safely with fs.readFileSync
-let configData: any = {};
+let configData: FirebaseAppConfig = {};
 try {
   const configFile = path.join(process.cwd(), "firebase-applet-config.json");
   if (fs.existsSync(configFile)) {
@@ -53,7 +71,7 @@ try {
 if (!getAdminApps().length) {
   try {
     initAdminApp({
-      projectId: configData.projectId || "e-learning-2ac36"
+      projectId: configData.projectId
     });
     console.log("Firebase Admin initialized successfully.");
   } catch (err) {
@@ -62,7 +80,7 @@ if (!getAdminApps().length) {
 }
 
 // In-memory store for OTPs and Invites (fallback & state tracking)
-const activeMFAChallenges = new Map<string, { code: string; email: string; expiresAt: number; tempClaims: any }>();
+const activeMFAChallenges = new Map<string, { code: string; email: string; expiresAt: number; tempClaims: FirebaseCustomClaims }>();
 const activeInvites = new Map<string, { token: string; email: string; contrato_id: string; empresa_id: string; entidade_id: string; perfil: string; status: string; createdAt: string }>();
 
 // Seed default demo invite
@@ -79,7 +97,7 @@ activeInvites.set("INV-DEMO-2026", {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  let PORT = Number(process.env.PORT) || 8500;
 
   app.use(express.json());
 
@@ -98,7 +116,7 @@ async function startServer() {
       // Default demo tenant & supplier metadata for custom claims
       let contrato_id = "CTR-2026-SYS";
       let empresa_id = "SUP-9823-STORAGE";
-      let perfil = "FINANCEIRO";
+      let perfil: 'FINANCEIRO' | 'FORNECEDOR' | 'GESTOR' | 'ADMIN' = "FINANCEIRO";
 
       if (email.includes("fornecedor")) {
         perfil = "FORNECEDOR";
@@ -138,7 +156,7 @@ async function startServer() {
       const targetProvider = provider === "microsoft" ? "microsoft.com" : "google.com";
       const userEmail = email || (provider === "microsoft" ? "carlos.eduardo@microsoft-corp.com" : "carlos.eduardo@gmail.com");
       const userDisplayName = displayName || (provider === "microsoft" ? "Carlos Eduardo (Microsoft OAuth SSO)" : "Carlos Eduardo (Google OAuth SSO)");
-      
+
       let uid = `oauth_${provider}_${userEmail.replace(/[^a-zA-Z0-9]/g, "_")}`;
 
       // Retrieve or create user in Firebase Auth via Admin SDK
@@ -456,8 +474,8 @@ async function startServer() {
         email,
         customClaims: claims,
         jwtPayloadPreview: {
-          iss: `https://securetoken.google.com/${configData.projectId || "e-learning-2ac36"}`,
-          aud: configData.projectId || "e-learning-2ac36",
+          iss: `https://securetoken.google.com/${configData.projectId}`,
+          aud: configData.projectId,
           auth_time: Math.floor(Date.now() / 1000),
           sub: uid,
           email,
@@ -531,25 +549,30 @@ async function startServer() {
   ];
 
   // 1. Query Financial Records based on User Custom Claims
-  app.get("/api/firestore/lancamentos", async (req, res) => {
+  app.get("/api/firestore/lancamentos", verifyFirebaseJWT, async (req: AuthenticatedRequest, res) => {
     try {
-      const contrato_id = (req.query.contrato_id as string) || "CTR-2026-SYS";
-      const fornecedor_id = req.query.fornecedor_id as string;
-      const perfil = (req.query.perfil as string) || "FINANCEIRO";
+      if (!req.decodedToken) {
+        return res.status(401).json({ error: "Acesso não autorizado." });
+      }
+      const contrato_id = req.decodedToken.contrato_id;
+      const fornecedor_id = req.decodedToken.empresa_id;
+      const perfil = req.decodedToken.perfil;
 
       // Attempt reading directly from Firestore Admin if active
-      let results = [];
+      let results: any[] = [];
       try {
-        const db = getAdminFirestore();
-        let query: any = db.collection("lancamentos_financeiros").where("contrato_id", "==", contrato_id);
-        if (perfil === "FORNECEDOR" && fornecedor_id) {
-          query = query.where("fornecedor_id", "==", fornecedor_id);
-        }
-        const snapshot = await query.get();
-        if (!snapshot.empty) {
-          snapshot.forEach((doc: any) => {
-            results.push({ id: doc.id, ...doc.data() });
-          });
+        if (isFirestoreEnabled()) {
+          const db = getAdminFirestore();
+          let query = db.collection("lancamentos_financeiros").where("contrato_id", "==", contrato_id);
+          if (perfil === "FORNECEDOR" && fornecedor_id) {
+            query = query.where("fornecedor_id", "==", fornecedor_id);
+          }
+          const snapshot = await query.get();
+          if (!snapshot.empty) {
+            snapshot.forEach((doc) => {
+              results.push({ id: doc.id, ...doc.data() });
+            });
+          }
         }
       } catch (fsErr) {
         // Fallback to in-memory store filtered strictly by rules
@@ -571,8 +594,8 @@ async function startServer() {
           contrato_id,
           fornecedor_id: perfil === "FORNECEDOR" ? fornecedor_id : "ALL_TENANT_SUPPLIERS",
           perfil,
-          rulesApplied: perfil === "FORNECEDOR" 
-            ? "Filtro Estrito: contrato_id == X AND fornecedor_id == Y" 
+          rulesApplied: perfil === "FORNECEDOR"
+            ? "Filtro Estrito: contrato_id == X AND fornecedor_id == Y"
             : "Filtro Intra-Contrato: contrato_id == X"
         },
         totalCount: results.length,
@@ -584,12 +607,17 @@ async function startServer() {
   });
 
   // 2. Add New Financial Record with Contract & Supplier Locking
-  app.post("/api/firestore/lancamentos", async (req, res) => {
+  app.post("/api/firestore/lancamentos", verifyFirebaseJWT, async (req: AuthenticatedRequest, res) => {
     try {
-      const { contrato_id, fornecedor_id, descricao, valor, tipo, status, data_vencimento, criado_por, perfil } = req.body || {};
+      if (!req.decodedToken) {
+        return res.status(401).json({ error: "Acesso não autorizado." });
+      }
+      const contrato_id = req.decodedToken.contrato_id;
+      const fornecedor_id = req.decodedToken.empresa_id;
+      const { descricao, valor, tipo, status, data_vencimento, criado_por } = req.body || {};
 
       if (!contrato_id || !fornecedor_id || !descricao || !valor) {
-        return res.status(400).json({ error: "Campos obrigatórios ausentes (contrato_id, fornecedor_id, descricao, valor)." });
+        return res.status(400).json({ error: "Campos obrigatórios ausentes (descricao, valor)." });
       }
 
       const newRecord = {
@@ -606,8 +634,10 @@ async function startServer() {
       };
 
       try {
-        const db = getAdminFirestore();
-        await db.collection("lancamentos_financeiros").doc(newRecord.id).set(newRecord);
+        if (isFirestoreEnabled()) {
+          const db = getAdminFirestore();
+          await db.collection("lancamentos_financeiros").doc(newRecord.id).set(newRecord);
+        }
       } catch (fsErr) {
         console.warn("Firestore Admin save warning, fallback in-memory:", fsErr);
       }
@@ -627,42 +657,44 @@ async function startServer() {
   // 3. Seed Firestore Infrastructure & Business Collections
   app.post("/api/firestore/seed-demo", async (req, res) => {
     try {
-      const db = getAdminFirestore();
+      if (isFirestoreEnabled()) {
+        const db = getAdminFirestore();
 
-      // Seed Contratos
-      await db.collection("contratos").doc("CTR-2026-SYS").set({
-        codigo_contrato: "CTR-2026-SYS",
-        razao_social: "Logistics Global Systems S.A.",
-        plano: "ENTERPRISE",
-        status: "ATIVO",
-        createdAt: new Date().toISOString()
-      });
+        // Seed Contratos
+        await db.collection("contratos").doc("CTR-2026-SYS").set({
+          codigo_contrato: "CTR-2026-SYS",
+          razao_social: "Logistics Global Systems S.A.",
+          plano: "ENTERPRISE",
+          status: "ATIVO",
+          createdAt: new Date().toISOString()
+        });
 
-      // Seed Empresas / Entidades
-      const emp1 = {
-        nome: "Storage & Infraestrutura Ltda",
-        cnpj_cpf: "12.345.678/0001-90",
-        tipo: "FORNECEDOR",
-        contrato_id: "CTR-2026-SYS",
-        createdAt: new Date().toISOString()
-      };
+        // Seed Empresas / Entidades
+        const emp1 = {
+          nome: "Storage & Infraestrutura Ltda",
+          cnpj_cpf: "12.345.678/0001-90",
+          tipo: "FORNECEDOR",
+          contrato_id: "CTR-2026-SYS",
+          createdAt: new Date().toISOString()
+        };
 
-      const emp2 = {
-        nome: "Transportes & Logística SP-RJ",
-        cnpj_cpf: "98.765.432/0001-10",
-        tipo: "FORNECEDOR",
-        contrato_id: "CTR-2026-SYS",
-        createdAt: new Date().toISOString()
-      };
+        const emp2 = {
+          nome: "Transportes & Logística SP-RJ",
+          cnpj_cpf: "98.765.432/0001-10",
+          tipo: "FORNECEDOR",
+          contrato_id: "CTR-2026-SYS",
+          createdAt: new Date().toISOString()
+        };
 
-      await db.collection("empresas").doc("SUP-9823-STORAGE").set(emp1);
-      await db.collection("empresas").doc("SUP-4012-LOGISTICA").set(emp2);
-      await db.collection("entidades").doc("SUP-9823-STORAGE").set(emp1);
-      await db.collection("entidades").doc("SUP-4012-LOGISTICA").set(emp2);
+        await db.collection("empresas").doc("SUP-9823-STORAGE").set(emp1);
+        await db.collection("empresas").doc("SUP-4012-LOGISTICA").set(emp2);
+        await db.collection("entidades").doc("SUP-9823-STORAGE").set(emp1);
+        await db.collection("entidades").doc("SUP-4012-LOGISTICA").set(emp2);
 
-      // Seed Financial Entries
-      for (const item of inMemoryLancamentos) {
-        await db.collection("lancamentos_financeiros").doc(item.id).set(item);
+        // Seed Financial Entries
+        for (const item of inMemoryLancamentos) {
+          await db.collection("lancamentos_financeiros").doc(item.id).set(item);
+        }
       }
 
       return res.json({
@@ -719,8 +751,11 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
   // ==========================================
 
   // GET Empresa Contratante
-  app.get("/api/contratante", async (req, res) => {
-    const contrato_id = (req.query.contrato_id as string) || "CTR-2026-SYS";
+  app.get("/api/contratante", verifyFirebaseJWT, async (req: AuthenticatedRequest, res) => {
+    if (!req.decodedToken) {
+      return res.status(401).json({ error: "Acesso não autorizado." });
+    }
+    const contrato_id = req.decodedToken.contrato_id;
     const emptyTemplate = {
       natureza: 'Publica',
       nome: '',
@@ -779,9 +814,12 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
   });
 
   // POST (Upsert) Empresa Contratante
-  app.post("/api/contratante", async (req, res) => {
+  app.post("/api/contratante", verifyFirebaseJWT, async (req: AuthenticatedRequest, res) => {
+    if (!req.decodedToken) {
+      return res.status(401).json({ error: "Acesso não autorizado." });
+    }
+    const targetContratoId = req.decodedToken.contrato_id;
     const {
-      contrato_id,
       natureza,
       nome,
       area,
@@ -792,8 +830,6 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
       gestorResponsavel,
       unidadeAdministrativa
     } = req.body || {};
-
-    const targetContratoId = contrato_id || "CTR-2026-SYS";
 
     const payload = {
       contrato_id: targetContratoId,
@@ -885,8 +921,11 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
   });
 
   // GET /api/empresas - List all companies for a tenant
-  app.get("/api/empresas", async (req, res) => {
-    const contrato_id = (req.query.contrato_id as string) || "CTR-2026-SYS";
+  app.get("/api/empresas", verifyFirebaseJWT, async (req: AuthenticatedRequest, res) => {
+    if (!req.decodedToken) {
+      return res.status(401).json({ error: "Acesso não autorizado." });
+    }
+    const contrato_id = req.decodedToken.contrato_id;
     try {
       if (!supabase) {
         const localData = inMemoryEmpresas.get(contrato_id) || [];
@@ -927,9 +966,13 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
   });
 
   // POST /api/empresas - Create/Update a company
-  app.post("/api/empresas", async (req, res) => {
+  app.post("/api/empresas", verifyFirebaseJWT, async (req: AuthenticatedRequest, res) => {
+    if (!req.decodedToken) {
+      return res.status(401).json({ error: "Acesso não autorizado." });
+    }
+    const contrato_id = req.decodedToken.contrato_id;
     const empresa = req.body || {};
-    const { id, contrato_id, nome, cnpj_cpf, tipo, emailContato, telefone, status, totalFaturado } = empresa;
+    const { id, nome, cnpj_cpf, tipo, emailContato, telefone, status, totalFaturado } = empresa;
 
     if (!id || !contrato_id || !nome || !cnpj_cpf) {
       return res.status(400).json({ error: "Campos id, contrato_id, nome e cnpj_cpf são obrigatórios." });
@@ -1032,9 +1075,12 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
   });
 
   // DELETE /api/empresas - Delete a company
-  app.delete("/api/empresas", async (req, res) => {
+  app.delete("/api/empresas", verifyFirebaseJWT, async (req: AuthenticatedRequest, res) => {
+    if (!req.decodedToken) {
+      return res.status(401).json({ error: "Acesso não autorizado." });
+    }
+    const contrato_id = req.decodedToken.contrato_id;
     const id = req.query.id as string;
-    const contrato_id = req.query.contrato_id as string;
 
     if (!id || !contrato_id) {
       return res.status(400).json({ error: "Parâmetros id e contrato_id são obrigatórios." });
@@ -1107,9 +1153,25 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  const listen = (port: number) => {
+    if (port > 8999) {
+      console.error("Nenhuma porta livre encontrada no intervalo de 8500 a 8999.");
+      process.exit(1);
+    }
+    const server = app.listen(port, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${port}`);
+    });
+    server.on("error", (err: any) => {
+      if (err.code === "EADDRINUSE") {
+        console.log(`Porta ${port} ocupada. Tentando porta ${port + 1}...`);
+        listen(port + 1);
+      } else {
+        console.error("Erro no servidor:", err);
+      }
+    });
+  };
+
+  listen(PORT);
 }
 
 startServer();
