@@ -6,15 +6,19 @@ interface ContratosViewProps {
   searchQuery: string;
   onOpenNovoChamado: () => void;
   onAddContract: (newContract: ContractItem) => void;
+  onUpdateContract: (updatedContract: ContractItem) => void;
+  onDeleteContract: (contractId: string) => void;
 }
 
 export const ContratosView: React.FC<ContratosViewProps> = ({
   contracts,
   searchQuery,
   onOpenNovoChamado,
-  onAddContract
+  onAddContract,
+  onUpdateContract,
+  onDeleteContract
 }) => {
-  const [filterStatus, setFilterStatus] = useState<'TODOS' | 'ATIVO' | 'RENOVAÇÃO'>('TODOS');
+  const [filterStatus, setFilterStatus] = useState<'TODOS' | 'ATIVO' | 'RENOVAÇÃO' | 'ENCERRADO'>('TODOS');
   const [selectedContract, setSelectedContract] = useState<ContractItem | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
@@ -24,6 +28,21 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
   const [expirationDate, setExpirationDate] = useState('');
   const [totalValue, setTotalValue] = useState('');
   const [category, setCategory] = useState('Armazenamento');
+  const [addStatus, setAddStatus] = useState<'ATIVO' | 'RENOVAÇÃO' | 'ENCERRADO'>('ATIVO');
+  const [addMarginAlert, setAddMarginAlert] = useState(false);
+
+  // Edit contract form state
+  const [editingContract, setEditingContract] = useState<ContractItem | null>(null);
+  const [editCode, setEditCode] = useState('');
+  const [editObject, setEditObject] = useState('');
+  const [editExpirationDate, setEditExpirationDate] = useState('');
+  const [editCategory, setEditCategory] = useState('Armazenamento');
+  const [editTotalValue, setEditTotalValue] = useState('');
+  const [editStatus, setEditStatus] = useState<'ATIVO' | 'RENOVAÇÃO' | 'ENCERRADO'>('ATIVO');
+  const [editMarginAlert, setEditMarginAlert] = useState(false);
+
+  // Delete confirmation state
+  const [contractToDelete, setContractToDelete] = useState<ContractItem | null>(null);
 
   const filteredContracts = contracts.filter((c) => {
     const matchesSearch =
@@ -48,11 +67,11 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
       code,
       object,
       expirationDate,
-      status: 'ATIVO',
+      status: addStatus,
       totalValue: val,
       monthlyValue: val / 12,
       category,
-      marginAlert: false
+      marginAlert: addMarginAlert
     };
 
     onAddContract(newContract);
@@ -61,6 +80,41 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
     setObject('');
     setExpirationDate('');
     setTotalValue('');
+    setAddStatus('ATIVO');
+    setAddMarginAlert(false);
+  };
+
+  const handleOpenEditModal = (contract: ContractItem) => {
+    setEditingContract(contract);
+    setEditCode(contract.code);
+    setEditObject(contract.object);
+    setEditExpirationDate(contract.expirationDate);
+    setEditCategory(contract.category || 'Armazenamento');
+    setEditTotalValue(contract.totalValue.toString());
+    setEditStatus(contract.status);
+    setEditMarginAlert(!!contract.marginAlert);
+  };
+
+  const handleUpdateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingContract || !editCode || !editObject || !editExpirationDate || !editTotalValue) return;
+
+    const val = parseFloat(editTotalValue.replace(/[^0-9,.]/g, '').replace(',', '.')) || 0;
+
+    const updatedContract: ContractItem = {
+      ...editingContract,
+      code: editCode,
+      object: editObject,
+      expirationDate: editExpirationDate,
+      category: editCategory,
+      totalValue: val,
+      monthlyValue: val / 12,
+      status: editStatus,
+      marginAlert: editMarginAlert
+    };
+
+    onUpdateContract(updatedContract);
+    setEditingContract(null);
   };
 
   return (
@@ -68,7 +122,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
       {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="font-headline-md text-headline-md text-[#191c1e]">
+          <h2 className="font-headline-md text-headline-md text-[#191c1e] font-bold">
             Gestão de Contratos
           </h2>
           <p className="text-[#404753] font-body-md mt-0.5">
@@ -86,14 +140,14 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex gap-2 border-b border-[#c0c7d6] pb-3">
-        {(['TODOS', 'ATIVO', 'RENOVAÇÃO'] as const).map((status) => (
+      <div className="flex flex-wrap gap-2 border-b border-[#c0c7d6] pb-3">
+        {(['TODOS', 'ATIVO', 'RENOVAÇÃO', 'ENCERRADO'] as const).map((status) => (
           <button
             key={status}
             onClick={() => setFilterStatus(status)}
             className={`px-4 py-2 rounded-md font-label-bold text-label-bold transition-all cursor-pointer ${
               filterStatus === status
-                ? 'bg-[#005daa] text-white shadow-2xs'
+                ? 'bg-[#005daa] text-white shadow-2xs font-bold'
                 : 'bg-white text-[#404753] border border-[#c0c7d6] hover:bg-[#f2f4f6]'
             }`}
           >
@@ -101,7 +155,9 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
               ? 'Todos os Contratos'
               : status === 'ATIVO'
               ? 'Ativos'
-              : 'Em Renovação'}
+              : status === 'RENOVAÇÃO'
+              ? 'Em Renovação'
+              : 'Encerrados'}
           </button>
         ))}
       </div>
@@ -160,9 +216,13 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                         <span className="px-2.5 py-1 bg-[#ecfdf5] text-[#10b981] text-[10px] font-bold rounded uppercase border border-[#10b981]/20">
                           Ativo
                         </span>
-                      ) : (
+                      ) : contract.status === 'RENOVAÇÃO' ? (
                         <span className="px-2.5 py-1 bg-[#fffbeb] text-[#f59e0b] text-[10px] font-bold rounded uppercase border border-[#f59e0b]/20">
                           Renovação
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 bg-red-50 text-red-600 text-[10px] font-bold rounded uppercase border border-red-200">
+                          Encerrado
                         </span>
                       )}
                     </td>
@@ -170,12 +230,29 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                       R$ {contract.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="p-4 text-center whitespace-nowrap">
-                      <button
-                        onClick={() => setSelectedContract(contract)}
-                        className="px-3 py-1 bg-[#eff6ff] text-[#005daa] rounded font-label-bold text-[12px] hover:bg-[#d4e3ff] transition-colors cursor-pointer mr-2"
-                      >
-                        Detalhes
-                      </button>
+                      <div className="flex justify-center gap-1.5">
+                        <button
+                          onClick={() => setSelectedContract(contract)}
+                          className="p-1.5 bg-[#eff6ff] text-[#005daa] rounded-md hover:bg-[#d4e3ff] transition-colors cursor-pointer flex items-center justify-center"
+                          title="Detalhes"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">visibility</span>
+                        </button>
+                        <button
+                          onClick={() => handleOpenEditModal(contract)}
+                          className="p-1.5 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors cursor-pointer flex items-center justify-center"
+                          title="Editar"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">edit</span>
+                        </button>
+                        <button
+                          onClick={() => setContractToDelete(contract)}
+                          className="p-1.5 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors cursor-pointer flex items-center justify-center"
+                          title="Excluir"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">delete</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -194,11 +271,11 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                 <span className="text-[10px] font-bold text-[#005daa] uppercase tracking-wider">
                   Ficha do Contrato
                 </span>
-                <h3 className="font-headline-sm text-[#191c1e]">{selectedContract.code}</h3>
+                <h3 className="font-headline-sm text-[#191c1e] font-bold">{selectedContract.code}</h3>
               </div>
               <button
                 onClick={() => setSelectedContract(null)}
-                className="text-[#707785] hover:text-[#191c1e]"
+                className="text-[#707785] hover:text-[#191c1e] cursor-pointer"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
@@ -233,7 +310,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                   <label className="text-[11px] font-label-bold text-[#707785] uppercase">
                     Valor Total
                   </label>
-                  <p className="font-metric-mono text-[#005daa]">
+                  <p className="font-metric-mono text-[#005daa] font-bold">
                     R${' '}
                     {selectedContract.totalValue.toLocaleString('pt-BR', {
                       minimumFractionDigits: 2
@@ -244,9 +321,9 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                   <label className="text-[11px] font-label-bold text-[#707785] uppercase">
                     Estimativa Mensal
                   </label>
-                  <p className="font-metric-mono text-[#191c1e]">
+                  <p className="font-metric-mono text-[#191c1e] font-bold">
                     R${' '}
-                    {(selectedContract.totalValue / 12).toLocaleString('pt-BR', {
+                    {((selectedContract.monthlyValue || (selectedContract.totalValue / 12))).toLocaleString('pt-BR', {
                       minimumFractionDigits: 2
                     })}
                   </p>
@@ -264,7 +341,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
             <div className="mt-6 pt-4 border-t border-[#e2e8f0] flex justify-end gap-3">
               <button
                 onClick={() => setSelectedContract(null)}
-                className="px-4 py-2 border border-[#c0c7d6] rounded-md font-label-bold text-[#404753] hover:bg-[#f2f4f6]"
+                className="px-4 py-2 border border-[#c0c7d6] rounded-md font-label-bold text-[#404753] hover:bg-[#f2f4f6] cursor-pointer"
               >
                 Fechar
               </button>
@@ -273,7 +350,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                   setSelectedContract(null);
                   onOpenNovoChamado();
                 }}
-                className="px-4 py-2 bg-[#005daa] text-white rounded-md font-label-bold hover:bg-[#0075d5]"
+                className="px-4 py-2 bg-[#005daa] text-white rounded-md font-label-bold hover:bg-[#0075d5] cursor-pointer"
               >
                 Solicitar Aditivo / Suporte
               </button>
@@ -287,10 +364,10 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6 border border-[#c0c7d6] shadow-xl animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-headline-sm text-[#005daa]">Cadastrar Novo Contrato</h3>
+              <h3 className="font-headline-sm text-[#005daa] font-bold">Cadastrar Novo Contrato</h3>
               <button
                 onClick={() => setIsAddModalOpen(false)}
-                className="text-[#707785] hover:text-[#191c1e]"
+                className="text-[#707785] hover:text-[#191c1e] cursor-pointer"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
@@ -298,7 +375,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
 
             <form onSubmit={handleCreateContract} className="space-y-4">
               <div>
-                <label className="font-label-bold text-[#191c1e] block mb-1">
+                <label className="font-label-bold text-[#191c1e] block mb-1 text-sm">
                   Código do Contrato
                 </label>
                 <input
@@ -312,7 +389,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
               </div>
 
               <div>
-                <label className="font-label-bold text-[#191c1e] block mb-1">
+                <label className="font-label-bold text-[#191c1e] block mb-1 text-sm">
                   Objeto do Contrato
                 </label>
                 <input
@@ -327,7 +404,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-label-bold text-[#191c1e] block mb-1">
+                  <label className="font-label-bold text-[#191c1e] block mb-1 text-sm">
                     Vencimento
                   </label>
                   <input
@@ -340,13 +417,13 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="font-label-bold text-[#191c1e] block mb-1">
+                  <label className="font-label-bold text-[#191c1e] block mb-1 text-sm">
                     Categoria
                   </label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full px-3.5 py-2 border border-[#c0c7d6] rounded-md font-body-md outline-none focus:border-[#005daa]"
+                    className="w-full px-3.5 py-2 border border-[#c0c7d6] rounded-md font-body-md outline-none focus:border-[#005daa] bg-white"
                   >
                     <option value="Armazenamento">Armazenamento</option>
                     <option value="Manutenção">Manutenção</option>
@@ -356,36 +433,247 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="font-label-bold text-[#191c1e] block mb-1">
-                  Valor Total (R$)
-                </label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-label-bold text-[#191c1e] block mb-1 text-sm">
+                    Valor Total (R$)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: 250000.00"
+                    value={totalValue}
+                    onChange={(e) => setTotalValue(e.target.value)}
+                    className="w-full px-3.5 py-2 border border-[#c0c7d6] rounded-md font-body-md outline-none focus:border-[#005daa]"
+                  />
+                </div>
+                <div>
+                  <label className="font-label-bold text-[#191c1e] block mb-1 text-sm">
+                    Status Inicial
+                  </label>
+                  <select
+                    value={addStatus}
+                    onChange={(e) => setAddStatus(e.target.value as any)}
+                    className="w-full px-3.5 py-2 border border-[#c0c7d6] rounded-md font-body-md outline-none focus:border-[#005daa] bg-white"
+                  >
+                    <option value="ATIVO">Ativo</option>
+                    <option value="RENOVAÇÃO">Renovação</option>
+                    <option value="ENCERRADO">Encerrado</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 py-1">
                 <input
-                  type="text"
-                  required
-                  placeholder="Ex: 250000.00"
-                  value={totalValue}
-                  onChange={(e) => setTotalValue(e.target.value)}
-                  className="w-full px-3.5 py-2 border border-[#c0c7d6] rounded-md font-body-md outline-none focus:border-[#005daa]"
+                  type="checkbox"
+                  id="addMarginAlert"
+                  checked={addMarginAlert}
+                  onChange={(e) => setAddMarginAlert(e.target.checked)}
+                  className="w-4 h-4 text-[#005daa] border-[#c0c7d6] rounded focus:ring-[#005daa]"
                 />
+                <label htmlFor="addMarginAlert" className="font-label-bold text-sm text-[#404753] select-none cursor-pointer">
+                  Habilitar Alerta de Margem Curta
+                </label>
               </div>
 
               <div className="flex justify-end gap-3 pt-3 border-t border-[#e2e8f0]">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 border border-[#c0c7d6] rounded-md font-label-bold text-[#404753] hover:bg-[#f2f4f6]"
+                  className="px-4 py-2 border border-[#c0c7d6] rounded-md font-label-bold text-[#404753] hover:bg-[#f2f4f6] cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#005daa] text-white rounded-md font-label-bold hover:bg-[#0075d5]"
+                  className="px-4 py-2 bg-[#005daa] text-white rounded-md font-label-bold hover:bg-[#0075d5] cursor-pointer"
                 >
                   Salvar Contrato
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Contract Modal */}
+      {editingContract && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 border border-[#c0c7d6] shadow-xl animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-headline-sm text-[#005daa] font-bold">Editar Contrato</h3>
+              <button
+                onClick={() => setEditingContract(null)}
+                className="text-[#707785] hover:text-[#191c1e] cursor-pointer"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateSubmit} className="space-y-4">
+              <div>
+                <label className="font-label-bold text-[#191c1e] block mb-1 text-sm">
+                  Código do Contrato
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: CTR-2026-099"
+                  value={editCode}
+                  onChange={(e) => setEditCode(e.target.value)}
+                  className="w-full px-3.5 py-2 border border-[#c0c7d6] rounded-md font-body-md outline-none focus:border-[#005daa]"
+                />
+              </div>
+
+              <div>
+                <label className="font-label-bold text-[#191c1e] block mb-1 text-sm">
+                  Objeto do Contrato
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Serviço de Gestão de Estoque"
+                  value={editObject}
+                  onChange={(e) => setEditObject(e.target.value)}
+                  className="w-full px-3.5 py-2 border border-[#c0c7d6] rounded-md font-body-md outline-none focus:border-[#005daa]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-label-bold text-[#191c1e] block mb-1 text-sm">
+                    Vencimento
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="DD/MM/AAAA"
+                    value={editExpirationDate}
+                    onChange={(e) => setEditExpirationDate(e.target.value)}
+                    className="w-full px-3.5 py-2 border border-[#c0c7d6] rounded-md font-body-md outline-none focus:border-[#005daa]"
+                  />
+                </div>
+                <div>
+                  <label className="font-label-bold text-[#191c1e] block mb-1 text-sm">
+                    Categoria
+                  </label>
+                  <select
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value)}
+                    className="w-full px-3.5 py-2 border border-[#c0c7d6] rounded-md font-body-md outline-none focus:border-[#005daa] bg-white"
+                  >
+                    <option value="Armazenamento">Armazenamento</option>
+                    <option value="Manutenção">Manutenção</option>
+                    <option value="Tecnologia">Tecnologia</option>
+                    <option value="Logística">Logística</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-label-bold text-[#191c1e] block mb-1 text-sm">
+                    Valor Total (R$)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: 250000.00"
+                    value={editTotalValue}
+                    onChange={(e) => setEditTotalValue(e.target.value)}
+                    className="w-full px-3.5 py-2 border border-[#c0c7d6] rounded-md font-body-md outline-none focus:border-[#005daa]"
+                  />
+                </div>
+                <div>
+                  <label className="font-label-bold text-[#191c1e] block mb-1 text-sm">
+                    Status
+                  </label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as any)}
+                    className="w-full px-3.5 py-2 border border-[#c0c7d6] rounded-md font-body-md outline-none focus:border-[#005daa] bg-white"
+                  >
+                    <option value="ATIVO">Ativo</option>
+                    <option value="RENOVAÇÃO">Renovação</option>
+                    <option value="ENCERRADO">Encerrado</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 py-1">
+                <input
+                  type="checkbox"
+                  id="editMarginAlert"
+                  checked={editMarginAlert}
+                  onChange={(e) => setEditMarginAlert(e.target.checked)}
+                  className="w-4 h-4 text-[#005daa] border-[#c0c7d6] rounded focus:ring-[#005daa]"
+                />
+                <label htmlFor="editMarginAlert" className="font-label-bold text-sm text-[#404753] select-none cursor-pointer">
+                  Alerta de Margem Ativo
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-[#e2e8f0]">
+                <button
+                  type="button"
+                  onClick={() => setEditingContract(null)}
+                  className="px-4 py-2 border border-[#c0c7d6] rounded-md font-label-bold text-[#404753] hover:bg-[#f2f4f6] cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#005daa] text-white rounded-md font-label-bold hover:bg-[#0075d5] cursor-pointer"
+                >
+                  Salvar Alterações
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {contractToDelete && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 border border-[#c0c7d6] shadow-xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 mb-4 text-[#ef4444]">
+              <span className="material-symbols-outlined text-[32px]">warning</span>
+              <h3 className="font-headline-sm text-lg font-bold text-[#191c1e]">Confirmar Exclusão</h3>
+            </div>
+            
+            <p className="text-body-md text-[#404753] mb-4 text-sm">
+              Tem certeza de que deseja excluir permanentemente o contrato abaixo? Esta ação não pode ser desfeita.
+            </p>
+
+            <div className="bg-slate-50 p-4 rounded-lg border border-[#e2e8f0] mb-6 space-y-2">
+              <p className="text-[10px] text-[#707785] uppercase font-bold tracking-wider">Informações do Contrato</p>
+              <div>
+                <span className="font-mono font-bold text-[#005daa] text-sm">{contractToDelete.code}</span>
+              </div>
+              <p className="font-bold text-[#191c1e] text-sm">{contractToDelete.object}</p>
+              <p className="text-body-sm text-[#404753] text-sm">
+                Valor: <span className="font-mono font-bold">R$ {contractToDelete.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setContractToDelete(null)}
+                className="px-4 py-2 border border-[#c0c7d6] rounded-md font-label-bold text-[#404753] hover:bg-[#f2f4f6] cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  onDeleteContract(contractToDelete.id);
+                  setContractToDelete(null);
+                }}
+                className="px-4 py-2 bg-[#ef4444] text-white rounded-md font-label-bold hover:bg-[#dc2626] cursor-pointer"
+              >
+                Confirmar Exclusão
+              </button>
+            </div>
           </div>
         </div>
       )}
