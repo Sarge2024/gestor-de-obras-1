@@ -1173,8 +1173,24 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
     });
   };
 
-  listen(PORT);
+  if (!process.env.VERCEL) {
+    listen(PORT);
+  }
+
+  return app;
 }
 
-startServer();
+let appPromise: Promise<express.Express> | null = null;
+
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default async function handler(req: any, res: any) {
+  if (!appPromise) {
+    appPromise = startServer();
+  }
+  const appInstance = await appPromise;
+  return appInstance(req, res);
+}
 
