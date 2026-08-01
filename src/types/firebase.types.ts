@@ -11,9 +11,9 @@ export interface FirebaseCustomClaims {
 export interface FirebaseAuthSession {
   uid: string;
   email: string;
-  displayName: string;
+  displayName?: string;
   photoURL?: string;
-  customClaims: FirebaseCustomClaims;
+  customClaims?: FirebaseCustomClaims;
   idToken: string;
   mfaVerified: boolean;
   mfaMethod?: 'EMAIL_OTP' | 'GOOGLE_2FA' | 'SMS_OTP' | string;

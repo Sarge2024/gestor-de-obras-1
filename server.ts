@@ -9,9 +9,27 @@ import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
 import dotenv from "dotenv";
 dotenv.config({ override: true });
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import jwt from "jsonwebtoken";
 import { verifyFirebaseJWT } from "./src/middleware/verifyFirebaseJWT";
 import { AuthenticatedRequest } from "./src/types/middleware.types";
 import { FirebaseCustomClaims } from "./src/types/firebase.types";
+
+// Helper function to create a scoped Supabase client with a custom JWT
+function getSupabaseClient(req: AuthenticatedRequest): SupabaseClient | null {
+  if (!supabaseUrl || !supabaseAnonKey || !req.decodedToken) return null;
+  const token = jwt.sign(
+    {
+      role: "authenticated",
+      sub: req.decodedToken.uid,
+      contrato_id: req.decodedToken.contrato_id,
+      perfil: req.decodedToken.perfil
+    },
+    process.env.SUPABASE_JWT_SECRET || "super-secret-jwt-token-with-at-least-32-characters-long"
+  );
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } }
+  });
+}
 
 // Check if Firebase Admin SDK has valid credentials to initialize Firestore
 const isFirestoreEnabled = () => {
@@ -149,39 +167,51 @@ async function startServer() {
     }
   });
 
-  // 1b. OAuth Principal Authentication Endpoint (Google / Microsoft SSO)
+  // 1b. OAuth Principal Authentication Endpoint (Google / Microsoft)
   app.post("/api/auth/oauth-login", async (req, res) => {
     try {
-      const { provider, email, displayName } = req.body || {};
+      const { provider, email, displayName, uid: reqUid, photoURL } = req.body || {};
       const targetProvider = provider === "microsoft" ? "microsoft.com" : "google.com";
       const userEmail = email || (provider === "microsoft" ? "carlos.eduardo@microsoft-corp.com" : "carlos.eduardo@gmail.com");
       const userDisplayName = displayName || (provider === "microsoft" ? "Carlos Eduardo (Microsoft OAuth SSO)" : "Carlos Eduardo (Google OAuth SSO)");
+      let uid = reqUid || `oauth_${provider}_${userEmail.replace(/[^a-zA-Z0-9]/g, "_")}`;
 
-      let uid = `oauth_${provider}_${userEmail.replace(/[^a-zA-Z0-9]/g, "_")}`;
-
-      // Retrieve or create user in Firebase Auth via Admin SDK
-      try {
-        const existingUser = await getAdminAuth().getUserByEmail(userEmail);
-        uid = existingUser.uid;
-      } catch (e) {
-        try {
-          const newUser = await getAdminAuth().createUser({
-            email: userEmail,
-            emailVerified: true,
-            displayName: userDisplayName
-          });
-          uid = newUser.uid;
-        } catch (createErr) {
-          console.warn("Firebase Admin createUser OAuth fallback:", createErr);
-        }
+      if (!supabase) {
+        return res.status(500).json({ error: "Banco de dados indisponível." });
       }
+
+      // Check if user exists in Supabase (Service Role key bypasses RLS for this admin check)
+      const { data: userData, error: userErr } = await supabase
+        .from('usuarios')
+        .select('*')
+        .eq('email', userEmail)
+        .single();
+
+      if (userErr || !userData) {
+        return res.status(403).json({ error: "Usuário não autorizado. O administrador deve cadastrá-lo previamente no sistema." });
+      }
+
+      if (userData.status === 'BLOQUEADO' || userData.status === 'INATIVO') {
+        return res.status(403).json({ error: "Usuário bloqueado ou inativo. Contate o administrador." });
+      }
+
+      // Update Supabase user with the latest info from OAuth if they match
+      if (userData.uid !== uid || userData.foto_url !== photoURL) {
+        await supabase
+          .from('usuarios')
+          .update({ uid: uid, nome: userDisplayName, foto_url: photoURL })
+          .eq('email', userEmail);
+      }
+
+      const contrato_id = userData.contrato_id;
+      const perfil = userData.perfil;
 
       // Mandatory Custom Claims Injection
       const customClaims = {
-        contrato_id: "CTR-2026-SYS",
-        empresa_id: "SUP-9823-STORAGE",
+        contrato_id,
+        empresa_id: "SUP-9823-STORAGE", // Temporário, pode vir do Supabase no futuro
         entidade_id: "SUP-9823-STORAGE",
-        perfil: "FINANCEIRO",
+        perfil,
         mfa_verified: true,
         auth_provider: targetProvider
       };
@@ -200,7 +230,6 @@ async function startServer() {
         const payloadStr = JSON.stringify({ uid, email: userEmail, customClaims });
         customToken = `mock_jwt_${Buffer.from(payloadStr).toString("base64")}`;
       }
-
       return res.json({
         success: true,
         provider: targetProvider,
@@ -208,6 +237,7 @@ async function startServer() {
           uid,
           email: userEmail,
           displayName: userDisplayName,
+          photoURL: photoURL || userData.foto_url,
           customClaims,
           idToken: customToken,
           mfaVerified: true,
@@ -929,12 +959,13 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
     }
     const contrato_id = req.decodedToken.contrato_id;
     try {
-      if (!supabase) {
+      const client = getSupabaseClient(req);
+      if (!client) {
         const localData = inMemoryEmpresas.get(contrato_id) || [];
         return res.json({ success: true, data: localData, synced: false, error: "Credenciais do Supabase ausentes no arquivo .env." });
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from("empresas_fornecedores")
         .select("*")
         .eq("contrato_id", contrato_id);
@@ -952,11 +983,11 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
         nome: item.nome,
         cnpj_cpf: item.cnpj_cpf,
         tipo: item.tipo,
-        emailContato: item.emailcontato !== undefined ? item.emailcontato : item.emailContato,
+        emailContato: item.email_contato !== undefined ? item.email_contato : item.emailContato,
         telefone: item.telefone,
         status: item.status,
-        totalFaturado: item.totalfaturado !== undefined ? Number(item.totalfaturado) : Number(item.totalFaturado || 0),
-        createdAt: item.createdat !== undefined ? item.createdat : item.createdAt
+        totalFaturado: item.total_faturado !== undefined ? Number(item.total_faturado) : Number(item.totalFaturado || 0),
+        createdAt: item.created_at !== undefined ? item.created_at : item.createdAt
       }));
 
       return res.json({ success: true, data: mappedData, synced: true });
@@ -993,18 +1024,18 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
       createdAt: empresa.createdAt || new Date().toISOString().split('T')[0]
     };
 
-    // Postgres DB Payload mapping camelCase properties to unquoted lowercase column names
+    // Postgres DB Payload mapping camelCase properties to unquoted snake_case columns
     const dbPayload = {
       id,
       contrato_id,
       nome,
       cnpj_cpf,
       tipo: tipo || "FORNECEDOR",
-      emailcontato: emailContato || "",
+      email_contato: emailContato || "",
       telefone: telefone || "",
       status: status || "ATIVO",
-      totalfaturado: Number(totalFaturado) || 0,
-      createdat: empresa.createdAt || new Date().toISOString().split('T')[0]
+      total_faturado: Number(totalFaturado) || 0,
+      created_at: empresa.createdAt || new Date().toISOString().split('T')[0]
     };
 
     // Update memory fallback
@@ -1018,19 +1049,18 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
     inMemoryEmpresas.set(contrato_id, list);
 
     try {
-      if (!supabase) {
-        return res.json({
-          success: true,
-          message: "Salvo temporariamente na memória local (Supabase não configurado).",
-          data: payload,
-          synced: false,
+      const client = getSupabaseClient(req);
+      if (!client) {
+        return res.status(403).json({
+          success: false,
+          message: "Acesso negado: Supabase não configurado.",
           error: "Credenciais do Supabase ausentes no arquivo .env."
         });
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from("empresas_fornecedores")
-        .upsert(dbPayload, { onConflict: "id,contrato_id" })
+        .upsert(dbPayload, { onConflict: "id, contrato_id" })
         .select();
 
       if (error) {
@@ -1051,11 +1081,11 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
         nome: savedItem.nome,
         cnpj_cpf: savedItem.cnpj_cpf,
         tipo: savedItem.tipo,
-        emailContato: savedItem.emailcontato !== undefined ? savedItem.emailcontato : savedItem.emailContato,
+        emailContato: savedItem.email_contato !== undefined ? savedItem.email_contato : savedItem.emailContato,
         telefone: savedItem.telefone,
         status: savedItem.status,
-        totalFaturado: savedItem.totalfaturado !== undefined ? Number(savedItem.totalfaturado) : Number(savedItem.totalFaturado || 0),
-        createdAt: savedItem.createdat !== undefined ? savedItem.createdat : savedItem.createdAt
+        totalFaturado: savedItem.total_faturado !== undefined ? Number(savedItem.total_faturado) : Number(savedItem.totalFaturado || 0),
+        createdAt: savedItem.created_at !== undefined ? savedItem.created_at : savedItem.createdAt
       };
 
       return res.json({
@@ -1094,7 +1124,8 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
     inMemoryEmpresas.set(contrato_id, updatedList);
 
     try {
-      if (!supabase) {
+      const client = getSupabaseClient(req);
+      if (!client) {
         return res.json({
           success: true,
           message: "Removido da memória local (Supabase não configurado).",
@@ -1103,7 +1134,7 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
         });
       }
 
-      const { error } = await supabase
+      const { error } = await client
         .from("empresas_fornecedores")
         .delete()
         .eq("id", id)

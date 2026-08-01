@@ -78,6 +78,7 @@ export default function App() {
       ...prev,
       email: session.email,
       name: session.displayName || prev.name,
+      avatarUrl: session.photoURL || prev.avatarUrl,
       role: session.customClaims?.perfil || prev.role
     }));
     setIsAuthenticated(true);

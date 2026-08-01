@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { MFAModal } from './MFAModal';
 import { AuthSession } from '../types';
+import { auth } from '../lib/firebase';
+import { signInWithPopup, GoogleAuthProvider, OAuthProvider } from 'firebase/auth';
 
 interface LoginScreenProps {
   onLoginSuccess: (session: AuthSession) => void;
@@ -127,21 +129,33 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     setIsLoading(true);
                     setErrorMessage('');
                     try {
+                      const provider = new GoogleAuthProvider();
+                      // This triggers the real browser popup
+                      const result = await signInWithPopup(auth, provider);
+                      const user = result.user;
+
+                      // Send real user data to our backend to get custom claims and validate Supabase
                       const res = await fetch('/api/auth/oauth-login', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ provider: 'google' })
+                        body: JSON.stringify({ 
+                          provider: 'google',
+                          uid: user.uid,
+                          email: user.email,
+                          displayName: user.displayName,
+                          photoURL: user.photoURL
+                        })
                       });
                       const data = await res.json();
                       setIsLoading(false);
                       if (res.ok && data.session) {
                         onLoginSuccess(data.session);
                       } else {
-                        setErrorMessage(data.error || 'Erro no login Google OAuth');
+                        setErrorMessage(data.error || 'Erro na validação do usuário no sistema.');
                       }
-                    } catch (e) {
+                    } catch (e: any) {
                       setIsLoading(false);
-                      setErrorMessage('Falha na autenticação Google OAuth');
+                      setErrorMessage(e.message || 'Falha na autenticação Google OAuth');
                     }
                   }}
                   className="w-full py-2.5 px-3 bg-white border border-[#c0c7d6] hover:bg-[#f8fafc] rounded-md font-label-bold text-xs text-[#1e293b] transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
@@ -174,21 +188,33 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     setIsLoading(true);
                     setErrorMessage('');
                     try {
+                      const provider = new OAuthProvider('microsoft.com');
+                      // This triggers the real browser popup
+                      const result = await signInWithPopup(auth, provider);
+                      const user = result.user;
+
+                      // Send real user data to our backend to get custom claims and validate Supabase
                       const res = await fetch('/api/auth/oauth-login', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ provider: 'microsoft' })
+                        body: JSON.stringify({ 
+                          provider: 'microsoft',
+                          uid: user.uid,
+                          email: user.email,
+                          displayName: user.displayName,
+                          photoURL: user.photoURL
+                        })
                       });
                       const data = await res.json();
                       setIsLoading(false);
                       if (res.ok && data.session) {
                         onLoginSuccess(data.session);
                       } else {
-                        setErrorMessage(data.error || 'Erro no login Microsoft OAuth');
+                        setErrorMessage(data.error || 'Erro na validação do usuário no sistema.');
                       }
-                    } catch (e) {
+                    } catch (e: any) {
                       setIsLoading(false);
-                      setErrorMessage('Falha na autenticação Microsoft OAuth');
+                      setErrorMessage(e.message || 'Falha na autenticação Microsoft OAuth');
                     }
                   }}
                   className="w-full py-2.5 px-3 bg-white border border-[#c0c7d6] hover:bg-[#f8fafc] rounded-md font-label-bold text-xs text-[#1e293b] transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
