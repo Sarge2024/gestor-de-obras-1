@@ -78,6 +78,8 @@ export interface ContractItem {
   monthlyValue?: number;
   category?: string;
   marginAlert?: boolean;
+  fornecedorId?: string;
+  fornecedorNome?: string;
 }
 
 export interface InvoiceItem {

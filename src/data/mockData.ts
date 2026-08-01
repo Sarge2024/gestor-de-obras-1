@@ -1,4 +1,4 @@
-import { UserProfile, ContractItem, InvoiceItem, PendingPayment, DRELine, ActivityItem, ChamadoTicket, SystemAlert } from '../types';
+import { UserProfile, ContractItem, InvoiceItem, PendingPayment, DRELine, ActivityItem, ChamadoTicket, SystemAlert, EmpresaItem } from '../types';
 
 export const initialProfile: UserProfile = {
   name: 'Logística Global SA',
@@ -19,7 +19,8 @@ export const initialContracts: ContractItem[] = [
     totalValue: 450000.00,
     monthlyValue: 37500.00,
     category: 'Armazenamento',
-    marginAlert: false
+    marginAlert: false,
+    fornecedorId: 'SUP-9823-STORAGE'
   },
   {
     id: '2',
@@ -30,7 +31,8 @@ export const initialContracts: ContractItem[] = [
     totalValue: 82500.00,
     monthlyValue: 6875.00,
     category: 'Manutenção',
-    marginAlert: true
+    marginAlert: true,
+    fornecedorId: 'SUP-9823-STORAGE'
   },
   {
     id: '3',
@@ -41,7 +43,8 @@ export const initialContracts: ContractItem[] = [
     totalValue: 1240000.00,
     monthlyValue: 103333.33,
     category: 'Tecnologia',
-    marginAlert: false
+    marginAlert: false,
+    fornecedorId: 'SUP-9823-STORAGE'
   },
   {
     id: '4',
@@ -52,7 +55,8 @@ export const initialContracts: ContractItem[] = [
     totalValue: 320000.00,
     monthlyValue: 26666.67,
     category: 'Logística',
-    marginAlert: true
+    marginAlert: true,
+    fornecedorId: 'SUP-4012-LOGISTICA'
   },
   {
     id: '5',
@@ -286,3 +290,55 @@ export const initialChamados: ChamadoTicket[] = [
     status: 'Aberto'
   }
 ];
+
+export const initialEmpresas: EmpresaItem[] = [
+  {
+    id: 'SUP-9823-STORAGE',
+    nome: 'Storage & Infraestrutura Ltda',
+    cnpj_cpf: '12.345.678/0001-90',
+    tipo: 'FORNECEDOR',
+    contrato_id: 'CTR-2026-SYS',
+    emailContato: 'contato@storageinfra.com.br',
+    telefone: '(11) 3456-7890',
+    status: 'ATIVO',
+    totalFaturado: 145000.00,
+    createdAt: '2026-01-15'
+  },
+  {
+    id: 'SUP-4012-LOGISTICA',
+    nome: 'Transportes & Logística SP-RJ',
+    cnpj_cpf: '98.765.432/0001-10',
+    tipo: 'FORNECEDOR',
+    contrato_id: 'CTR-2026-SYS',
+    emailContato: 'faturamento@logisitcasprj.com',
+    telefone: '(11) 98765-4321',
+    status: 'ATIVO',
+    totalFaturado: 238000.00,
+    createdAt: '2026-02-10'
+  },
+  {
+    id: 'SUP-1102-AUDITORIA',
+    nome: 'Auditoria & Compliance Fiscal',
+    cnpj_cpf: '45.123.890/0001-33',
+    tipo: 'PARCEIRO',
+    contrato_id: 'CTR-2026-SYS',
+    emailContato: 'contato@auditoriafiscal.com',
+    telefone: '(21) 2233-4455',
+    status: 'EM_ANALISE',
+    totalFaturado: 45000.00,
+    createdAt: '2026-05-20'
+  },
+  {
+    id: 'CLI-5540-VAREJO',
+    nome: 'Redes de Varejo Sudeste S.A.',
+    cnpj_cpf: '33.888.999/0001-05',
+    tipo: 'CLIENTE',
+    contrato_id: 'CTR-2026-SYS',
+    emailContato: 'compras@varejosudeste.com.br',
+    telefone: '(11) 4004-8899',
+    status: 'ATIVO',
+    totalFaturado: 512000.00,
+    createdAt: '2026-03-01'
+  }
+];
+

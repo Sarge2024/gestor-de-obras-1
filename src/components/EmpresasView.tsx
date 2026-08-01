@@ -3,62 +3,12 @@ import { AuthSession, EmpresaItem } from '../types';
 
 interface EmpresasViewProps {
   authSession?: AuthSession | null;
+  empresas: EmpresaItem[];
+  setEmpresas: React.Dispatch<React.SetStateAction<EmpresaItem[]>>;
 }
 
-export const EmpresasView: React.FC<EmpresasViewProps> = ({ authSession }) => {
+export const EmpresasView: React.FC<EmpresasViewProps> = ({ authSession, empresas, setEmpresas }) => {
   const contratoId = authSession?.customClaims?.contrato_id || 'CTR-2026-SYS';
-
-  // Seeded state list of companies for full CRUD operations
-  const [empresas, setEmpresas] = useState<EmpresaItem[]>([
-    {
-      id: 'SUP-9823-STORAGE',
-      nome: 'Storage & Infraestrutura Ltda',
-      cnpj_cpf: '12.345.678/0001-90',
-      tipo: 'FORNECEDOR',
-      contrato_id: 'CTR-2026-SYS',
-      emailContato: 'contato@storageinfra.com.br',
-      telefone: '(11) 3456-7890',
-      status: 'ATIVO',
-      totalFaturado: 145000.00,
-      createdAt: '2026-01-15'
-    },
-    {
-      id: 'SUP-4012-LOGISTICA',
-      nome: 'Transportes & Logística SP-RJ',
-      cnpj_cpf: '98.765.432/0001-10',
-      tipo: 'FORNECEDOR',
-      contrato_id: 'CTR-2026-SYS',
-      emailContato: 'faturamento@logisitcasprj.com',
-      telefone: '(11) 98765-4321',
-      status: 'ATIVO',
-      totalFaturado: 238000.00,
-      createdAt: '2026-02-10'
-    },
-    {
-      id: 'SUP-1102-AUDITORIA',
-      nome: 'Auditoria & Compliance Fiscal',
-      cnpj_cpf: '45.123.890/0001-33',
-      tipo: 'PARCEIRO',
-      contrato_id: 'CTR-2026-SYS',
-      emailContato: 'contato@auditoriafiscal.com',
-      telefone: '(21) 2233-4455',
-      status: 'EM_ANALISE',
-      totalFaturado: 45000.00,
-      createdAt: '2026-05-20'
-    },
-    {
-      id: 'CLI-5540-VAREJO',
-      nome: 'Redes de Varejo Sudeste S.A.',
-      cnpj_cpf: '33.888.999/0001-05',
-      tipo: 'CLIENTE',
-      contrato_id: 'CTR-2026-SYS',
-      emailContato: 'compras@varejosudeste.com.br',
-      telefone: '(11) 4004-8899',
-      status: 'ATIVO',
-      totalFaturado: 512000.00,
-      createdAt: '2026-03-01'
-    }
-  ]);
 
   // Filters & Search
   const [search, setSearch] = useState('');

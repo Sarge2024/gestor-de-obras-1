@@ -9,7 +9,8 @@ import {
   ActivityItem,
   ChamadoTicket,
   SystemAlert,
-  AuthSession
+  AuthSession,
+  EmpresaItem
 } from './types';
 import {
   initialProfile,
@@ -19,7 +20,8 @@ import {
   initialDREData,
   initialActivities,
   initialAlerts,
-  initialChamados
+  initialChamados,
+  initialEmpresas
 } from './data/mockData';
 
 import { Sidebar } from './components/Sidebar';
@@ -67,6 +69,7 @@ export default function App() {
   // Application Datasets
   const [user, setUser] = useState<UserProfile>(initialProfile);
   const [contracts, setContracts] = useState<ContractItem[]>(initialContracts);
+  const [empresas, setEmpresas] = useState<EmpresaItem[]>(initialEmpresas);
   const [invoices, setInvoices] = useState<InvoiceItem[]>(initialInvoices);
   const [pendingPayments] = useState<PendingPayment[]>(initialPendingPayments);
   const [dreData] = useState<DRELine[]>(initialDREData);
@@ -113,6 +116,39 @@ export default function App() {
       },
       ...prev
     ]);
+  };
+
+  const handleUpdateContract = (updatedContract: ContractItem) => {
+    setContracts((prev) =>
+      prev.map((c) => (c.id === updatedContract.id ? updatedContract : c))
+    );
+    setActivities((prev) => [
+      {
+        id: Date.now().toString(),
+        title: `Contrato ${updatedContract.code} atualizado`,
+        timestamp: 'Agora mesmo',
+        type: 'contract',
+        color: 'processing'
+      },
+      ...prev
+    ]);
+  };
+
+  const handleDeleteContract = (contractId: string) => {
+    const contractToDelete = contracts.find((c) => c.id === contractId);
+    setContracts((prev) => prev.filter((c) => c.id !== contractId));
+    if (contractToDelete) {
+      setActivities((prev) => [
+        {
+          id: Date.now().toString(),
+          title: `Contrato ${contractToDelete.code} excluído`,
+          timestamp: 'Agora mesmo',
+          type: 'contract',
+          color: 'warning'
+        },
+        ...prev
+      ]);
+    }
   };
 
   const handleUploadInvoice = (newInvoice: InvoiceItem) => {
@@ -309,9 +345,12 @@ export default function App() {
           {activeTab === 'contratos' && (
             <ContratosView
               contracts={contracts}
+              empresas={empresas}
               searchQuery={searchQuery}
               onOpenNovoChamado={() => setIsNovoChamadoOpen(true)}
               onAddContract={handleAddContract}
+              onUpdateContract={handleUpdateContract}
+              onDeleteContract={handleDeleteContract}
             />
           )}
 
@@ -324,7 +363,11 @@ export default function App() {
           )}
 
           {(activeTab === 'empresas' || activeTab === 'entidades') && (
-            <EmpresasView authSession={authSession} />
+            <EmpresasView
+              authSession={authSession}
+              empresas={empresas}
+              setEmpresas={setEmpresas}
+            />
           )}
 
           {activeTab === 'usuarios' && (

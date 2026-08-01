@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { ContractItem } from '../types';
+import { ContractItem, EmpresaItem } from '../types';
 
 interface ContratosViewProps {
   contracts: ContractItem[];
+  empresas: EmpresaItem[];
   searchQuery: string;
   onOpenNovoChamado: () => void;
   onAddContract: (newContract: ContractItem) => void;
@@ -12,6 +13,7 @@ interface ContratosViewProps {
 
 export const ContratosView: React.FC<ContratosViewProps> = ({
   contracts,
+  empresas,
   searchQuery,
   onOpenNovoChamado,
   onAddContract,
@@ -30,6 +32,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
   const [category, setCategory] = useState('Armazenamento');
   const [addStatus, setAddStatus] = useState<'ATIVO' | 'RENOVAÇÃO' | 'ENCERRADO'>('ATIVO');
   const [addMarginAlert, setAddMarginAlert] = useState(false);
+  const [fornecedorId, setFornecedorId] = useState('');
 
   // Edit contract form state
   const [editingContract, setEditingContract] = useState<ContractItem | null>(null);
@@ -40,6 +43,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
   const [editTotalValue, setEditTotalValue] = useState('');
   const [editStatus, setEditStatus] = useState<'ATIVO' | 'RENOVAÇÃO' | 'ENCERRADO'>('ATIVO');
   const [editMarginAlert, setEditMarginAlert] = useState(false);
+  const [editFornecedorId, setEditFornecedorId] = useState('');
 
   // Delete confirmation state
   const [contractToDelete, setContractToDelete] = useState<ContractItem | null>(null);
@@ -71,7 +75,9 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
       totalValue: val,
       monthlyValue: val / 12,
       category,
-      marginAlert: addMarginAlert
+      marginAlert: addMarginAlert,
+      fornecedorId: fornecedorId || undefined,
+      fornecedorNome: empresas.find(emp => emp.id === fornecedorId)?.nome
     };
 
     onAddContract(newContract);
@@ -82,6 +88,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
     setTotalValue('');
     setAddStatus('ATIVO');
     setAddMarginAlert(false);
+    setFornecedorId('');
   };
 
   const handleOpenEditModal = (contract: ContractItem) => {
@@ -93,6 +100,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
     setEditTotalValue(contract.totalValue.toString());
     setEditStatus(contract.status);
     setEditMarginAlert(!!contract.marginAlert);
+    setEditFornecedorId(contract.fornecedorId || '');
   };
 
   const handleUpdateSubmit = (e: React.FormEvent) => {
@@ -110,7 +118,9 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
       totalValue: val,
       monthlyValue: val / 12,
       status: editStatus,
-      marginAlert: editMarginAlert
+      marginAlert: editMarginAlert,
+      fornecedorId: editFornecedorId || undefined,
+      fornecedorNome: empresas.find(emp => emp.id === editFornecedorId)?.nome
     };
 
     onUpdateContract(updatedContract);
@@ -175,6 +185,9 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                   Objeto do Contrato
                 </th>
                 <th className="p-4 text-[11px] font-label-bold text-[#404753] uppercase tracking-wider">
+                  Fornecedor
+                </th>
+                <th className="p-4 text-[11px] font-label-bold text-[#404753] uppercase tracking-wider">
                   Categoria
                 </th>
                 <th className="p-4 text-[11px] font-label-bold text-[#404753] uppercase tracking-wider">
@@ -194,7 +207,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
             <tbody className="divide-y divide-[#e2e8f0] text-body-md">
               {filteredContracts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-[#707785]">
+                  <td colSpan={8} className="text-center py-8 text-[#707785]">
                     Nenhum contrato encontrado para os filtros selecionados.
                   </td>
                 </tr>
@@ -206,6 +219,11 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                     </td>
                     <td className="p-4 font-semibold text-[#191c1e]">
                       {contract.object}
+                    </td>
+                    <td className="p-4 font-medium text-[#404753]">
+                      {empresas.find((emp) => emp.id === contract.fornecedorId)?.nome || contract.fornecedorNome || (
+                        <span className="text-[#8e9aa8] italic text-[11px]">Sem Vínculo</span>
+                      )}
                     </td>
                     <td className="p-4 text-[#404753]">{contract.category || 'Geral'}</td>
                     <td className="p-4 text-[#404753] whitespace-nowrap">
@@ -288,6 +306,17 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                 </label>
                 <p className="font-bold text-[#191c1e] text-body-lg">
                   {selectedContract.object}
+                </p>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-label-bold text-[#707785] uppercase">
+                  Fornecedor / Empresa Vinculada
+                </label>
+                <p className="font-semibold text-[#005daa]">
+                  {empresas.find((emp) => emp.id === selectedContract.fornecedorId)?.nome || selectedContract.fornecedorNome || (
+                    <span className="text-[#8e9aa8] italic">Não vinculado</span>
+                  )}
                 </p>
               </div>
 
@@ -400,6 +429,24 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                   onChange={(e) => setObject(e.target.value)}
                   className="w-full px-3.5 py-2 border border-[#c0c7d6] rounded-md font-body-md outline-none focus:border-[#005daa]"
                 />
+              </div>
+
+              <div>
+                <label className="font-label-bold text-[#191c1e] block mb-1 text-sm">
+                  Fornecedor / Empresa Vinculada
+                </label>
+                <select
+                  value={fornecedorId}
+                  onChange={(e) => setFornecedorId(e.target.value)}
+                  className="w-full px-3.5 py-2 border border-[#c0c7d6] rounded-md font-body-md outline-none focus:border-[#005daa] bg-white"
+                >
+                  <option value="">-- Selecione uma Empresa / Fornecedor --</option>
+                  {empresas.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.nome} ({emp.tipo})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -537,6 +584,24 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                   onChange={(e) => setEditObject(e.target.value)}
                   className="w-full px-3.5 py-2 border border-[#c0c7d6] rounded-md font-body-md outline-none focus:border-[#005daa]"
                 />
+              </div>
+
+              <div>
+                <label className="font-label-bold text-[#191c1e] block mb-1 text-sm">
+                  Fornecedor / Empresa Vinculada
+                </label>
+                <select
+                  value={editFornecedorId}
+                  onChange={(e) => setEditFornecedorId(e.target.value)}
+                  className="w-full px-3.5 py-2 border border-[#c0c7d6] rounded-md font-body-md outline-none focus:border-[#005daa] bg-white"
+                >
+                  <option value="">-- Selecione uma Empresa / Fornecedor --</option>
+                  {empresas.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.nome} ({emp.tipo})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
