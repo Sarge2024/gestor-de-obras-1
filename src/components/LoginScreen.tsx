@@ -90,7 +90,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <span className="material-symbols-outlined text-[#005daa] text-4xl">hub</span>
             </div>
             <h1 className="font-headline-md text-headline-md text-[#005daa] tracking-tight">
-              Systems Storage
+              Works Manager
             </h1>
             <p className="font-body-md text-[#404753] mt-1.5 text-center">
               Supplier Portal Infrastructure

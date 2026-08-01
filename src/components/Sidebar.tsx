@@ -52,7 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="mb-8 px-2 flex items-center justify-between">
           <div>
             <h1 className="font-headline-sm text-headline-sm font-extrabold text-[#005daa] tracking-tight">
-              Systems Storage
+              Works Manager
             </h1>
             <p className="text-[10px] text-[#707785] font-label-bold uppercase tracking-wider mt-0.5">
               Supplier Portal

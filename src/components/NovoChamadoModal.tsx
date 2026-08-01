@@ -66,7 +66,7 @@ export const NovoChamadoModal: React.FC<NovoChamadoModalProps> = ({
             </div>
             <div>
               <h3 className="font-headline-sm text-[#005daa]">Abrir Novo Chamado</h3>
-              <p className="text-[11px] text-[#707785]">Suporte ao Fornecedor - Systems Storage</p>
+              <p className="text-[11px] text-[#707785]">Suporte ao Fornecedor - Works Manager</p>
             </div>
           </div>
           <button

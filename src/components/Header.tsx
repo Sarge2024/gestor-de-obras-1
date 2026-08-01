@@ -33,7 +33,7 @@ export const Header: React.FC<HeaderProps> = ({
       case 'alertas':
         return 'Alertas e Notificações';
       default:
-        return 'Systems Storage';
+        return 'Works Manager';
     }
   };
 

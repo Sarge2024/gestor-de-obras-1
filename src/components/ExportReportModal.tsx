@@ -27,7 +27,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
         <div id="printable-report" className="space-y-6">
           <div className="flex justify-between items-start pb-4 border-b-2 border-[#005daa]">
             <div>
-              <h1 className="font-headline-md text-[#005daa] font-extrabold">Systems Storage</h1>
+              <h1 className="font-headline-md text-[#005daa] font-extrabold">Works Manager</h1>
               <p className="text-[10px] font-bold text-[#707785] uppercase tracking-wider">
                 Relatório Consolidado Financeiro (DRE)
               </p>
@@ -94,7 +94,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
           </div>
 
           <p className="text-[10px] text-[#707785] text-center pt-2 border-t border-[#e2e8f0]">
-            Documento emitido eletronicamente via Systems Storage Supplier Management System. Válido para simples conferência.
+            Documento emitido eletronicamente via Works Manager Supplier Management System. Válido para simples conferência.
           </p>
         </div>
 
