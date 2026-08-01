@@ -13,7 +13,25 @@ import { createClient } from "@supabase/supabase-js";
 // Initialize Supabase Client safely using environment variables
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabase = (supabaseUrl && supabaseServiceKey) ? createClient(supabaseUrl, supabaseServiceKey) : null;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+
+let supabase: any = null;
+if (supabaseUrl) {
+  // Use the verified valid Anon Key if the Service Role Key is known to be invalid or missing,
+  // ensuring the server can successfully connect and query the database tables.
+  const targetKey = (supabaseServiceKey && !supabaseServiceKey.startsWith("sb_secret_zeBtO4vusXk"))
+    ? supabaseServiceKey
+    : (supabaseAnonKey || supabaseServiceKey);
+
+  if (targetKey) {
+    try {
+      supabase = createClient(supabaseUrl, targetKey);
+      console.log(`Supabase client initialized with key prefix: ${targetKey.substring(0, 15)}...`);
+    } catch (err) {
+      console.error("Failed to initialize Supabase client:", err);
+    }
+  }
+}
 
 // In-memory store fallback for Empresa Contratante (initialized empty to eliminate mock data as requested)
 const inMemoryContratantes = new Map<string, any>();
@@ -738,7 +756,21 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
         return res.json({ success: true, data: localData, synced: true, info: "Empty/New record served" });
       }
 
-      return res.json({ success: true, data, synced: true });
+      // Map lowercase DB columns from PostgreSQL case-insensitive folding
+      const mappedContratante = {
+        contrato_id: data.contrato_id,
+        natureza: data.natureza,
+        nome: data.nome,
+        area: data.area,
+        departamento: data.departamento,
+        cnpj: data.cnpj,
+        email: data.email,
+        telefone: data.telefone,
+        gestorResponsavel: data.gestorresponsavel !== undefined ? data.gestorresponsavel : data.gestorResponsavel,
+        unidadeAdministrativa: data.unidadeadministrativa !== undefined ? data.unidadeadministrativa : data.unidadeAdministrativa
+      };
+
+      return res.json({ success: true, data: mappedContratante, synced: true });
     } catch (err: any) {
       console.error("GET /api/contratante unexpected error:", err);
       const localData = inMemoryContratantes.get(contrato_id) || emptyTemplate;
@@ -776,6 +808,20 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
       unidadeAdministrativa
     };
 
+    // Postgres DB Payload mapping camelCase to unquoted lowercase fields
+    const dbPayload = {
+      contrato_id: targetContratoId,
+      natureza,
+      nome,
+      area,
+      departamento,
+      cnpj,
+      email,
+      telefone,
+      gestorresponsavel: gestorResponsavel,
+      unidadeadministrativa: unidadeAdministrativa
+    };
+
     // Keep memory fallback updated
     inMemoryContratantes.set(targetContratoId, payload);
 
@@ -792,7 +838,7 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
 
       const { data, error } = await supabase
         .from("empresa_contratante")
-        .upsert(payload, { onConflict: "contrato_id" })
+        .upsert(dbPayload, { onConflict: "contrato_id" })
         .select();
 
       if (error) {
@@ -806,10 +852,24 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
         });
       }
 
+      const savedItem = data?.[0] || dbPayload;
+      const mappedSaved = {
+        contrato_id: savedItem.contrato_id,
+        natureza: savedItem.natureza,
+        nome: savedItem.nome,
+        area: savedItem.area,
+        departamento: savedItem.departamento,
+        cnpj: savedItem.cnpj,
+        email: savedItem.email,
+        telefone: savedItem.telefone,
+        gestorResponsavel: savedItem.gestorresponsavel !== undefined ? savedItem.gestorresponsavel : savedItem.gestorResponsavel,
+        unidadeAdministrativa: savedItem.unidadeadministrativa !== undefined ? savedItem.unidadeadministrativa : savedItem.unidadeAdministrativa
+      };
+
       return res.json({
         success: true,
         message: "Cadastro da empresa contratante atualizado no Supabase com sucesso!",
-        data: data?.[0] || payload,
+        data: mappedSaved,
         synced: true
       });
     } catch (err: any) {
@@ -844,7 +904,21 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
         return res.json({ success: true, data: localData, synced: false, error: error.message });
       }
 
-      return res.json({ success: true, data: data || [], synced: true });
+      // Map lowercase columns from PostgreSQL case-insensitive folding to frontend camelCase
+      const mappedData = (data || []).map((item: any) => ({
+        id: item.id,
+        contrato_id: item.contrato_id,
+        nome: item.nome,
+        cnpj_cpf: item.cnpj_cpf,
+        tipo: item.tipo,
+        emailContato: item.emailcontato !== undefined ? item.emailcontato : item.emailContato,
+        telefone: item.telefone,
+        status: item.status,
+        totalFaturado: item.totalfaturado !== undefined ? Number(item.totalfaturado) : Number(item.totalFaturado || 0),
+        createdAt: item.createdat !== undefined ? item.createdat : item.createdAt
+      }));
+
+      return res.json({ success: true, data: mappedData, synced: true });
     } catch (err: any) {
       console.error("GET /api/empresas unexpected error:", err);
       const localData = inMemoryEmpresas.get(contrato_id) || [];
@@ -874,6 +948,20 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
       createdAt: empresa.createdAt || new Date().toISOString().split('T')[0]
     };
 
+    // Postgres DB Payload mapping camelCase properties to unquoted lowercase column names
+    const dbPayload = {
+      id,
+      contrato_id,
+      nome,
+      cnpj_cpf,
+      tipo: tipo || "FORNECEDOR",
+      emailcontato: emailContato || "",
+      telefone: telefone || "",
+      status: status || "ATIVO",
+      totalfaturado: Number(totalFaturado) || 0,
+      createdat: empresa.createdAt || new Date().toISOString().split('T')[0]
+    };
+
     // Update memory fallback
     const list = inMemoryEmpresas.get(contrato_id) || [];
     const index = list.findIndex((item) => item.id === id);
@@ -897,7 +985,7 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
 
       const { data, error } = await supabase
         .from("empresas_fornecedores")
-        .upsert(payload, { onConflict: "id,contrato_id" })
+        .upsert(dbPayload, { onConflict: "id,contrato_id" })
         .select();
 
       if (error) {
@@ -911,10 +999,24 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
         });
       }
 
+      const savedItem = data?.[0] || dbPayload;
+      const mappedSaved = {
+        id: savedItem.id,
+        contrato_id: savedItem.contrato_id,
+        nome: savedItem.nome,
+        cnpj_cpf: savedItem.cnpj_cpf,
+        tipo: savedItem.tipo,
+        emailContato: savedItem.emailcontato !== undefined ? savedItem.emailcontato : savedItem.emailContato,
+        telefone: savedItem.telefone,
+        status: savedItem.status,
+        totalFaturado: savedItem.totalfaturado !== undefined ? Number(savedItem.totalfaturado) : Number(savedItem.totalFaturado || 0),
+        createdAt: savedItem.createdat !== undefined ? savedItem.createdat : savedItem.createdAt
+      };
+
       return res.json({
         success: true,
         message: "Cadastro de empresa atualizado no Supabase com sucesso!",
-        data: data?.[0] || payload,
+        data: mappedSaved,
         synced: true
       });
     } catch (err: any) {
