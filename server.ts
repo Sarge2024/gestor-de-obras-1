@@ -6,6 +6,27 @@ import { GoogleGenAI } from "@google/genai";
 import { initializeApp as initAdminApp, getApps as getAdminApps } from "firebase-admin/app";
 import { getAuth as getAdminAuth } from "firebase-admin/auth";
 import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
+import "dotenv/config";
+import { createClient } from "@supabase/supabase-js";
+
+// Initialize Supabase Client safely using environment variables
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = (supabaseUrl && supabaseServiceKey) ? createClient(supabaseUrl, supabaseServiceKey) : null;
+
+// In-memory store fallback for Empresa Contratante
+const inMemoryContratantes = new Map<string, any>();
+inMemoryContratantes.set("CTR-2026-SYS", {
+  natureza: 'Publica',
+  nome: 'DER-SP - Departamento de Estradas de Rodagem do Estado de São Paulo',
+  area: 'Infraestrutura e Transportes Rodoviários',
+  departamento: 'Diretoria de Engenharia, Malha Viária e Gestão de Contratos',
+  cnpj: '43.050.494/0001-41',
+  email: 'diretoria.contratos@der.sp.gov.br',
+  telefone: '(11) 3311-1400',
+  gestorResponsavel: 'Dr. Fernando M. Siqueira',
+  unidadeAdministrativa: 'Sede Central - São Paulo/SP'
+});
 
 // Initialize Firebase Admin SDK safely with fs.readFileSync
 let configData: any = {};
@@ -678,6 +699,163 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
       return res.json({
         insight:
           "Sua margem aumentou 4% devido à redução nos custos de frete. Recomendamos renegociar o contrato de armazenagem até o dia 15."
+      });
+    }
+  });
+
+  // ==========================================
+  // SUPABASE CONTRACTING COMPANY REGISTER
+  // ==========================================
+
+  // GET Empresa Contratante
+  app.get("/api/contratante", async (req, res) => {
+    const contrato_id = (req.query.contrato_id as string) || "CTR-2026-SYS";
+    try {
+      if (!supabase) {
+        const localData = inMemoryContratantes.get(contrato_id) || {
+          natureza: 'Publica',
+          nome: 'DER-SP - Departamento de Estradas de Rodagem do Estado de São Paulo',
+          area: 'Infraestrutura e Transportes Rodoviários',
+          departamento: 'Diretoria de Engenharia, Malha Viária e Gestão de Contratos',
+          cnpj: '43.050.494/0001-41',
+          email: 'diretoria.contratos@der.sp.gov.br',
+          telefone: '(11) 3311-1400',
+          gestorResponsavel: 'Dr. Fernando M. Siqueira',
+          unidadeAdministrativa: 'Sede Central - São Paulo/SP'
+        };
+        return res.json({ success: true, data: localData, synced: false, error: "Credenciais do Supabase ausentes no arquivo .env." });
+      }
+
+      const { data, error } = await supabase
+        .from("empresa_contratante")
+        .select("*")
+        .eq("contrato_id", contrato_id)
+        .maybeSingle();
+
+      if (error) {
+        console.warn(`Supabase fetch error for ${contrato_id}, using memory fallback:`, error.message);
+        const localData = inMemoryContratantes.get(contrato_id) || {
+          natureza: 'Publica',
+          nome: 'DER-SP - Departamento de Estradas de Rodagem do Estado de São Paulo',
+          area: 'Infraestrutura e Transportes Rodoviários',
+          departamento: 'Diretoria de Engenharia, Malha Viária e Gestão de Contratos',
+          cnpj: '43.050.494/0001-41',
+          email: 'diretoria.contratos@der.sp.gov.br',
+          telefone: '(11) 3311-1400',
+          gestorResponsavel: 'Dr. Fernando M. Siqueira',
+          unidadeAdministrativa: 'Sede Central - São Paulo/SP'
+        };
+        return res.json({ success: true, data: localData, synced: false, error: error.message });
+      }
+
+      if (!data) {
+        // No record yet, return default
+        const localData = inMemoryContratantes.get(contrato_id) || {
+          natureza: 'Publica',
+          nome: 'DER-SP - Departamento de Estradas de Rodagem do Estado de São Paulo',
+          area: 'Infraestrutura e Transportes Rodoviários',
+          departamento: 'Diretoria de Engenharia, Malha Viária e Gestão de Contratos',
+          cnpj: '43.050.494/0001-41',
+          email: 'diretoria.contratos@der.sp.gov.br',
+          telefone: '(11) 3311-1400',
+          gestorResponsavel: 'Dr. Fernando M. Siqueira',
+          unidadeAdministrativa: 'Sede Central - São Paulo/SP'
+        };
+        return res.json({ success: true, data: localData, synced: true, info: "Default record served" });
+      }
+
+      return res.json({ success: true, data, synced: true });
+    } catch (err: any) {
+      console.error("GET /api/contratante unexpected error:", err);
+      const localData = inMemoryContratantes.get(contrato_id) || {
+        natureza: 'Publica',
+        nome: 'DER-SP - Departamento de Estradas de Rodagem do Estado de São Paulo',
+        area: 'Infraestrutura e Transportes Rodoviários',
+        departamento: 'Diretoria de Engenharia, Malha Viária e Gestão de Contratos',
+        cnpj: '43.050.494/0001-41',
+        email: 'diretoria.contratos@der.sp.gov.br',
+        telefone: '(11) 3311-1400',
+        gestorResponsavel: 'Dr. Fernando M. Siqueira',
+        unidadeAdministrativa: 'Sede Central - São Paulo/SP'
+      };
+      return res.json({ success: true, data: localData, synced: false, error: err.message });
+    }
+  });
+
+  // POST (Upsert) Empresa Contratante
+  app.post("/api/contratante", async (req, res) => {
+    const {
+      contrato_id,
+      natureza,
+      nome,
+      area,
+      departamento,
+      cnpj,
+      email,
+      telefone,
+      gestorResponsavel,
+      unidadeAdministrativa
+    } = req.body || {};
+
+    const targetContratoId = contrato_id || "CTR-2026-SYS";
+
+    const payload = {
+      contrato_id: targetContratoId,
+      natureza,
+      nome,
+      area,
+      departamento,
+      cnpj,
+      email,
+      telefone,
+      gestorResponsavel,
+      unidadeAdministrativa
+    };
+
+    // Keep memory fallback updated
+    inMemoryContratantes.set(targetContratoId, payload);
+
+    try {
+      if (!supabase) {
+        return res.json({
+          success: true,
+          message: "Salvo temporariamente na memória local (Supabase não configurado).",
+          data: payload,
+          synced: false,
+          error: "Credenciais do Supabase ausentes no arquivo .env."
+        });
+      }
+
+      const { data, error } = await supabase
+        .from("empresa_contratante")
+        .upsert(payload, { onConflict: "contrato_id" })
+        .select();
+
+      if (error) {
+        console.warn("Supabase upsert error, saved in memory fallback:", error.message);
+        return res.json({
+          success: true,
+          message: "Salvo temporariamente na memória local (Supabase indisponível ou tabela ausente).",
+          data: payload,
+          synced: false,
+          error: error.message
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: "Cadastro da empresa contratante atualizado no Supabase com sucesso!",
+        data: data?.[0] || payload,
+        synced: true
+      });
+    } catch (err: any) {
+      console.error("POST /api/contratante unexpected error:", err);
+      return res.json({
+        success: true,
+        message: "Salvo temporariamente na memória local devido a um erro inesperado.",
+        data: payload,
+        synced: false,
+        error: err.message
       });
     }
   });

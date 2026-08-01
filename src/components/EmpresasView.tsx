@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthSession, EmpresaItem } from '../types';
 
 interface EmpresasViewProps {
@@ -34,23 +34,96 @@ export const EmpresasView: React.FC<EmpresasViewProps> = ({ authSession, empresa
   const [isEditingContratante, setIsEditingContratante] = useState(false);
   const [tempContratante, setTempContratante] = useState({ ...empresaContratante });
 
+  // Supabase Database Sync Status State
+  const [supabaseLoading, setSupabaseLoading] = useState(false);
+  const [supabaseSynced, setSupabaseSynced] = useState<boolean | null>(null);
+  const [supabaseError, setSupabaseError] = useState<string | null>(null);
+  const [showSqlHelp, setShowSqlHelp] = useState(false);
+
+  // Load contracting company data from Supabase (Full stack backend client proxy)
+  useEffect(() => {
+    const fetchContratante = async () => {
+      setSupabaseLoading(true);
+      try {
+        const response = await fetch(`/api/contratante?contrato_id=${encodeURIComponent(contratoId)}`);
+        const json = await response.json();
+        if (json.success && json.data) {
+          setEmpresaContratante(json.data);
+          setTempContratante(json.data);
+          setSupabaseSynced(json.synced);
+          setSupabaseError(json.error || null);
+        } else {
+          setSupabaseSynced(false);
+          setSupabaseError(json.error || 'Erro desconhecido');
+        }
+      } catch (err: any) {
+        console.error("Fetch contratante failed:", err);
+        setSupabaseSynced(false);
+        setSupabaseError(err.message || 'Erro de conexão');
+      } finally {
+        setSupabaseLoading(false);
+      }
+    };
+    fetchContratante();
+  }, [contratoId]);
+
   const handleStartEditingContratante = () => {
     setTempContratante({ ...empresaContratante });
     setIsEditingContratante(true);
   };
 
-  const handleSaveContratante = (e: React.FormEvent) => {
+  const handleSaveContratante = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tempContratante.nome.trim()) {
       showNotification('error', 'O Nome da Empresa Contratante é obrigatório.');
       return;
     }
-    setEmpresaContratante({ ...tempContratante });
-    setIsEditingContratante(false);
-    showNotification(
-      'success',
-      `Cadastro da Empresa Contratante (${tempContratante.natureza === 'Publica' ? 'Pública' : 'Privada'}) atualizado com sucesso!`
-    );
+
+    setSupabaseLoading(true);
+    try {
+      const response = await fetch('/api/contratante', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contrato_id: contratoId,
+          ...tempContratante
+        })
+      });
+      const json = await response.json();
+      if (json.success) {
+        setEmpresaContratante(json.data);
+        setSupabaseSynced(json.synced);
+        setSupabaseError(json.error || null);
+        setIsEditingContratante(false);
+
+        if (json.synced) {
+          showNotification(
+            'success',
+            `Cadastro da Empresa Contratante salvo no Supabase com sucesso!`
+          );
+        } else {
+          showNotification(
+            'info',
+            `Cadastro atualizado localmente. (Supabase sem tabela ou offline)`
+          );
+        }
+      } else {
+        showNotification('error', `Falha ao salvar: ${json.error || 'erro desconhecido'}`);
+      }
+    } catch (err: any) {
+      console.error("Save contratante failed:", err);
+      // Local fallback
+      setEmpresaContratante({ ...tempContratante });
+      setIsEditingContratante(false);
+      setSupabaseSynced(false);
+      setSupabaseError(err.message || 'Erro de rede');
+      showNotification(
+        'info',
+        'Salvo em memória devido a um erro de conexão.'
+      );
+    } finally {
+      setSupabaseLoading(false);
+    }
   };
 
   // Modals state
@@ -391,6 +464,85 @@ export const EmpresasView: React.FC<EmpresasViewProps> = ({ authSession, empresa
                 </button>
               )}
             </div>
+
+            {/* Supabase Connection Status Banner */}
+            <div className={`p-4 rounded-lg border text-xs transition-all ${
+              supabaseSynced === true
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800 shadow-2xs'
+                : 'bg-amber-50 border-amber-200 text-amber-800 shadow-2xs'
+            }`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <span className={`material-symbols-outlined text-lg mt-0.5 ${
+                    supabaseSynced === true ? 'text-emerald-600' : 'text-amber-600'
+                  }`}>
+                    {supabaseSynced === true ? 'database' : 'database_off'}
+                  </span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-sm">
+                        {supabaseSynced === true ? 'Sincronizado com Supabase' : 'Modo de Armazenamento Local / Fallback'}
+                      </h4>
+                      {supabaseLoading && (
+                        <span className="animate-spin text-xs text-slate-400">⏳</span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-slate-600 leading-relaxed">
+                      {supabaseSynced === true
+                        ? 'O cadastro da empresa contratante está integrado e sincronizado com a sua base de dados do Supabase.'
+                        : 'O aplicativo está rodando em modo local pois a tabela "empresa_contratante" não foi criada no Supabase ou a conexão está offline.'}
+                    </p>
+                    {supabaseError && (
+                      <p className="mt-1 font-mono text-[11px] bg-white/60 p-1.5 rounded border border-amber-200/50">
+                        Aviso: {supabaseError}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {supabaseSynced !== true && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSqlHelp(!showSqlHelp)}
+                    className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 font-bold text-xs rounded transition-all cursor-pointer whitespace-nowrap self-start sm:self-center"
+                  >
+                    {showSqlHelp ? 'Ocultar Instruções' : 'Ver Instruções SQL'}
+                  </button>
+                )}
+              </div>
+
+              {/* SQL Instructions Expansion */}
+              {supabaseSynced !== true && showSqlHelp && (
+                <div className="mt-4 p-4 bg-slate-900 text-slate-100 rounded-md border border-slate-800 font-mono text-[11px] space-y-3">
+                  <div className="flex justify-between items-center text-slate-400 border-b border-slate-800 pb-2">
+                    <span>Script SQL para o Editor do Supabase</span>
+                    <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-300 font-sans font-bold">PostgreSQL</span>
+                  </div>
+                  <pre className="overflow-x-auto whitespace-pre p-2 bg-slate-950/60 rounded text-amber-200 leading-normal font-mono select-all">
+{`CREATE TABLE IF NOT EXISTS empresa_contratante (
+  contrato_id TEXT PRIMARY KEY,
+  natureza TEXT CHECK (natureza IN ('Privada', 'Publica')),
+  nome TEXT NOT NULL,
+  area TEXT,
+  departamento TEXT,
+  cnpj TEXT,
+  email TEXT,
+  telefone TEXT,
+  gestorResponsavel TEXT,
+  unidadeAdministrativa TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+-- Desabilitar RLS para desenvolvimento rápido
+ALTER TABLE empresa_contratante DISABLE ROW LEVEL SECURITY;`}
+                  </pre>
+                  <p className="text-[10px] text-slate-400 font-sans leading-relaxed">
+                    Copie o script acima, acesse o painel do seu Supabase, clique em <strong>SQL Editor</strong>, cole o código e execute clicando em <strong>Run</strong>. Em seguida, salve o cadastro aqui ou recarregue para sincronizar automaticamente.
+                  </p>
+                </div>
+              )}
+            </div>
+
 
             {/* Form Section */}
             {isEditingContratante ? (
