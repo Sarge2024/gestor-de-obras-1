@@ -18,6 +18,9 @@ const supabase = (supabaseUrl && supabaseServiceKey) ? createClient(supabaseUrl,
 // In-memory store fallback for Empresa Contratante (initialized empty to eliminate mock data as requested)
 const inMemoryContratantes = new Map<string, any>();
 
+// In-memory store fallback for Empresas Fornecedoras (initialized empty to eliminate mock data as requested)
+const inMemoryEmpresas = new Map<string, any[]>();
+
 // Initialize Firebase Admin SDK safely with fs.readFileSync
 let configData: any = {};
 try {
@@ -815,6 +818,167 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
         success: true,
         message: "Salvo temporariamente na memória local devido a um erro inesperado.",
         data: payload,
+        synced: false,
+        error: err.message
+      });
+    }
+  });
+
+  // GET /api/empresas - List all companies for a tenant
+  app.get("/api/empresas", async (req, res) => {
+    const contrato_id = (req.query.contrato_id as string) || "CTR-2026-SYS";
+    try {
+      if (!supabase) {
+        const localData = inMemoryEmpresas.get(contrato_id) || [];
+        return res.json({ success: true, data: localData, synced: false, error: "Credenciais do Supabase ausentes no arquivo .env." });
+      }
+
+      const { data, error } = await supabase
+        .from("empresas_fornecedores")
+        .select("*")
+        .eq("contrato_id", contrato_id);
+
+      if (error) {
+        console.warn(`Supabase fetch error for empresas under ${contrato_id}, using memory fallback:`, error.message);
+        const localData = inMemoryEmpresas.get(contrato_id) || [];
+        return res.json({ success: true, data: localData, synced: false, error: error.message });
+      }
+
+      return res.json({ success: true, data: data || [], synced: true });
+    } catch (err: any) {
+      console.error("GET /api/empresas unexpected error:", err);
+      const localData = inMemoryEmpresas.get(contrato_id) || [];
+      return res.json({ success: true, data: localData, synced: false, error: err.message });
+    }
+  });
+
+  // POST /api/empresas - Create/Update a company
+  app.post("/api/empresas", async (req, res) => {
+    const empresa = req.body || {};
+    const { id, contrato_id, nome, cnpj_cpf, tipo, emailContato, telefone, status, totalFaturado } = empresa;
+
+    if (!id || !contrato_id || !nome || !cnpj_cpf) {
+      return res.status(400).json({ error: "Campos id, contrato_id, nome e cnpj_cpf são obrigatórios." });
+    }
+
+    const payload = {
+      id,
+      contrato_id,
+      nome,
+      cnpj_cpf,
+      tipo: tipo || "FORNECEDOR",
+      emailContato: emailContato || "",
+      telefone: telefone || "",
+      status: status || "ATIVO",
+      totalFaturado: Number(totalFaturado) || 0,
+      createdAt: empresa.createdAt || new Date().toISOString().split('T')[0]
+    };
+
+    // Update memory fallback
+    const list = inMemoryEmpresas.get(contrato_id) || [];
+    const index = list.findIndex((item) => item.id === id);
+    if (index >= 0) {
+      list[index] = payload;
+    } else {
+      list.push(payload);
+    }
+    inMemoryEmpresas.set(contrato_id, list);
+
+    try {
+      if (!supabase) {
+        return res.json({
+          success: true,
+          message: "Salvo temporariamente na memória local (Supabase não configurado).",
+          data: payload,
+          synced: false,
+          error: "Credenciais do Supabase ausentes no arquivo .env."
+        });
+      }
+
+      const { data, error } = await supabase
+        .from("empresas_fornecedores")
+        .upsert(payload, { onConflict: "id,contrato_id" })
+        .select();
+
+      if (error) {
+        console.warn("Supabase upsert companies error, saved in memory fallback:", error.message);
+        return res.json({
+          success: true,
+          message: "Salvo temporariamente na memória local (Supabase indisponível ou tabela ausente).",
+          data: payload,
+          synced: false,
+          error: error.message
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: "Cadastro de empresa atualizado no Supabase com sucesso!",
+        data: data?.[0] || payload,
+        synced: true
+      });
+    } catch (err: any) {
+      console.error("POST /api/empresas unexpected error:", err);
+      return res.json({
+        success: true,
+        message: "Salvo temporariamente na memória local devido a um erro inesperado.",
+        data: payload,
+        synced: false,
+        error: err.message
+      });
+    }
+  });
+
+  // DELETE /api/empresas - Delete a company
+  app.delete("/api/empresas", async (req, res) => {
+    const id = req.query.id as string;
+    const contrato_id = req.query.contrato_id as string;
+
+    if (!id || !contrato_id) {
+      return res.status(400).json({ error: "Parâmetros id e contrato_id são obrigatórios." });
+    }
+
+    // Update memory fallback
+    const list = inMemoryEmpresas.get(contrato_id) || [];
+    const updatedList = list.filter((item) => item.id !== id);
+    inMemoryEmpresas.set(contrato_id, updatedList);
+
+    try {
+      if (!supabase) {
+        return res.json({
+          success: true,
+          message: "Removido da memória local (Supabase não configurado).",
+          synced: false,
+          error: "Credenciais do Supabase ausentes no arquivo .env."
+        });
+      }
+
+      const { error } = await supabase
+        .from("empresas_fornecedores")
+        .delete()
+        .eq("id", id)
+        .eq("contrato_id", contrato_id);
+
+      if (error) {
+        console.warn("Supabase delete companies error:", error.message);
+        return res.json({
+          success: true,
+          message: "Removido da memória local (Supabase indisponível ou tabela ausente).",
+          synced: false,
+          error: error.message
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: "Empresa excluída do Supabase com sucesso!",
+        synced: true
+      });
+    } catch (err: any) {
+      console.error("DELETE /api/empresas unexpected error:", err);
+      return res.json({
+        success: true,
+        message: "Removido da memória local devido a um erro inesperado.",
         synced: false,
         error: err.message
       });

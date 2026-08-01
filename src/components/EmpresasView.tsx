@@ -67,6 +67,22 @@ export const EmpresasView: React.FC<EmpresasViewProps> = ({ authSession, empresa
     fetchContratante();
   }, [contratoId]);
 
+  // Load supplier/client/partner companies from Supabase
+  useEffect(() => {
+    const fetchEmpresas = async () => {
+      try {
+        const response = await fetch(`/api/empresas?contrato_id=${encodeURIComponent(contratoId)}`);
+        const json = await response.json();
+        if (json.success && json.data) {
+          setEmpresas(json.data);
+        }
+      } catch (err) {
+        console.error("Fetch companies failed:", err);
+      }
+    };
+    fetchEmpresas();
+  }, [contratoId, setEmpresas]);
+
   const handleStartEditingContratante = () => {
     setTempContratante({ ...empresaContratante });
     setIsEditingContratante(true);
@@ -196,7 +212,7 @@ export const EmpresasView: React.FC<EmpresasViewProps> = ({ authSession, empresa
   };
 
   // Submit Handler for Create or Edit (C and U)
-  const handleSaveEmpresa = (e: React.FormEvent) => {
+  const handleSaveEmpresa = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const cleanNome = sanitizeInput(formData.nome);
@@ -207,80 +223,130 @@ export const EmpresasView: React.FC<EmpresasViewProps> = ({ authSession, empresa
       return;
     }
 
-    if (editingEmpresa) {
-      // UPDATE (U)
-      const updatedList = empresas.map((item) => {
-        if (item.id === editingEmpresa.id) {
-          return {
-            ...item,
-            nome: cleanNome,
-            cnpj_cpf: cleanCnpj,
-            tipo: formData.tipo,
-            emailContato: sanitizeInput(formData.emailContato),
-            telefone: sanitizeInput(formData.telefone),
-            status: formData.status,
-            totalFaturado: Number(formData.totalFaturado) || 0
-          };
-        }
-        return item;
-      });
+    setSupabaseLoading(true);
 
-      setEmpresas(updatedList);
-      showNotification('success', `Empresa "${cleanNome}" atualizada com sucesso.`);
+    let finalId = '';
+    let isNew = true;
+
+    if (editingEmpresa) {
+      finalId = editingEmpresa.id;
+      isNew = false;
     } else {
-      // CREATE (C)
-      const generatedId = formData.idCustom
+      finalId = formData.idCustom
         ? sanitizeInput(formData.idCustom).toUpperCase()
         : `${formData.idPrefix}-${Math.floor(1000 + Math.random() * 9000)}-${cleanNome
             .substring(0, 7)
             .toUpperCase()
             .replace(/[^A-Z0-9]/g, '')}`;
-
-      const newEmpresa: EmpresaItem = {
-        id: generatedId,
-        nome: cleanNome,
-        cnpj_cpf: cleanCnpj,
-        tipo: formData.tipo,
-        contrato_id: contratoId,
-        emailContato: sanitizeInput(formData.emailContato),
-        telefone: sanitizeInput(formData.telefone),
-        status: formData.status,
-        totalFaturado: Number(formData.totalFaturado) || 0,
-        createdAt: new Date().toISOString().split('T')[0]
-      };
-
-      setEmpresas([newEmpresa, ...empresas]);
-      showNotification('success', `Nova empresa "${cleanNome}" cadastrada com ID ${generatedId}.`);
     }
 
-    setIsModalOpen(false);
+    const payload: EmpresaItem = {
+      id: finalId,
+      nome: cleanNome,
+      cnpj_cpf: cleanCnpj,
+      tipo: formData.tipo,
+      contrato_id: contratoId,
+      emailContato: sanitizeInput(formData.emailContato),
+      telefone: sanitizeInput(formData.telefone),
+      status: formData.status,
+      totalFaturado: Number(formData.totalFaturado) || 0,
+      createdAt: editingEmpresa?.createdAt || new Date().toISOString().split('T')[0]
+    };
+
+    try {
+      const response = await fetch('/api/empresas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const json = await response.json();
+
+      if (json.success) {
+        if (isNew) {
+          setEmpresas([json.data, ...empresas]);
+          showNotification('success', `Nova empresa "${cleanNome}" cadastrada com sucesso.`);
+        } else {
+          const updatedList = empresas.map((item) => (item.id === finalId ? json.data : item));
+          setEmpresas(updatedList);
+          showNotification('success', `Empresa "${cleanNome}" atualizada com sucesso.`);
+        }
+      } else {
+        showNotification('error', `Falha ao salvar empresa: ${json.error || 'Erro desconhecido'}`);
+      }
+    } catch (err: any) {
+      console.error("Save company failed:", err);
+      // Fallback in memory
+      if (isNew) {
+        setEmpresas([payload, ...empresas]);
+      } else {
+        const updatedList = empresas.map((item) => (item.id === finalId ? payload : item));
+        setEmpresas(updatedList);
+      }
+      showNotification('info', `Salvo temporariamente na memória local devido a um erro de conexão.`);
+    } finally {
+      setSupabaseLoading(false);
+      setIsModalOpen(false);
+    }
   };
 
   // DELETE (D)
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingEmpresa) return;
     const companyName = deletingEmpresa.nome;
     const companyId = deletingEmpresa.id;
 
-    setEmpresas(empresas.filter((item) => item.id !== companyId));
-    setDeletingEmpresa(null);
-    showNotification('info', `Empresa "${companyName}" (${companyId}) foi removida do cadastro.`);
+    setSupabaseLoading(true);
+    try {
+      const response = await fetch(`/api/empresas?id=${encodeURIComponent(companyId)}&contrato_id=${encodeURIComponent(contratoId)}`, {
+        method: 'DELETE'
+      });
+      const json = await response.json();
+
+      if (json.success) {
+        setEmpresas(empresas.filter((item) => item.id !== companyId));
+        showNotification('info', `Empresa "${companyName}" (${companyId}) foi removida do cadastro.`);
+      } else {
+        showNotification('error', `Falha ao excluir empresa: ${json.error || 'Erro desconhecido'}`);
+      }
+    } catch (err: any) {
+      console.error("Delete company failed:", err);
+      // Fallback local
+      setEmpresas(empresas.filter((item) => item.id !== companyId));
+      showNotification('info', `Removido localmente devido a um erro de conexão.`);
+    } finally {
+      setSupabaseLoading(false);
+      setDeletingEmpresa(null);
+    }
   };
 
   // Quick Status Toggle (ATIVO <-> BLOQUEADO)
-  const handleToggleStatus = (empresa: EmpresaItem) => {
+  const handleToggleStatus = async (empresa: EmpresaItem) => {
     const nextStatus: 'ATIVO' | 'BLOQUEADO' = empresa.status === 'ATIVO' ? 'BLOQUEADO' : 'ATIVO';
+    const updatedPayload = { ...empresa, status: nextStatus };
 
-    setEmpresas(
-      empresas.map((item) => {
-        if (item.id === empresa.id) {
-          return { ...item, status: nextStatus };
-        }
-        return item;
-      })
-    );
+    setSupabaseLoading(true);
+    try {
+      const response = await fetch('/api/empresas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedPayload)
+      });
+      const json = await response.json();
 
-    showNotification('info', `Status da empresa "${empresa.nome}" alterado para ${nextStatus}.`);
+      if (json.success) {
+        setEmpresas(empresas.map((item) => (item.id === empresa.id ? json.data : item)));
+        showNotification('info', `Status da empresa "${empresa.nome}" alterado para ${nextStatus}.`);
+      } else {
+        showNotification('error', `Falha ao alterar status: ${json.error || 'Erro desconhecido'}`);
+      }
+    } catch (err: any) {
+      console.error("Toggle company status failed:", err);
+      // Fallback local
+      setEmpresas(empresas.map((item) => (item.id === empresa.id ? updatedPayload : item)));
+      showNotification('info', `Status alterado localmente devido a um erro de conexão.`);
+    } finally {
+      setSupabaseLoading(false);
+    }
   };
 
   // Export List as CSV
@@ -489,8 +555,8 @@ export const EmpresasView: React.FC<EmpresasViewProps> = ({ authSession, empresa
                     </div>
                     <p className="mt-0.5 text-slate-600 leading-relaxed">
                       {supabaseSynced === true
-                        ? 'O cadastro da empresa contratante está integrado e sincronizado com a sua base de dados do Supabase.'
-                        : 'O aplicativo está rodando em modo local pois a tabela "empresa_contratante" não foi criada no Supabase ou a conexão está offline.'}
+                        ? 'O cadastro das empresas está integrado e sincronizado com a sua base de dados do Supabase.'
+                        : 'O aplicativo está rodando em modo local pois as tabelas "empresa_contratante" e/ou "empresas_fornecedores" não foram criadas no Supabase ou a conexão está offline.'}
                     </p>
                     {supabaseError && (
                       <p className="mt-1 font-mono text-[11px] bg-white/60 p-1.5 rounded border border-amber-200/50">
@@ -533,11 +599,26 @@ export const EmpresasView: React.FC<EmpresasViewProps> = ({ authSession, empresa
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
+CREATE TABLE IF NOT EXISTS empresas_fornecedores (
+  id TEXT NOT NULL,
+  contrato_id TEXT NOT NULL,
+  nome TEXT NOT NULL,
+  cnpj_cpf TEXT NOT NULL,
+  tipo TEXT CHECK (tipo IN ('FORNECEDOR', 'CLIENTE', 'PARCEIRO', 'CONTRATANTE')),
+  emailContato TEXT,
+  telefone TEXT,
+  status TEXT CHECK (status IN ('ATIVO', 'BLOQUEADO', 'EM_ANALISE')),
+  totalFaturado NUMERIC DEFAULT 0,
+  createdAt TEXT,
+  PRIMARY KEY (id, contrato_id)
+);
+
 -- Desabilitar RLS para desenvolvimento rápido
-ALTER TABLE empresa_contratante DISABLE ROW LEVEL SECURITY;`}
+ALTER TABLE empresa_contratante DISABLE ROW LEVEL SECURITY;
+ALTER TABLE empresas_fornecedores DISABLE ROW LEVEL SECURITY;`}
                   </pre>
                   <p className="text-[10px] text-slate-400 font-sans leading-relaxed">
-                    Copie o script acima, acesse o painel do seu Supabase, clique em <strong>SQL Editor</strong>, cole o código e execute clicando em <strong>Run</strong>. Em seguida, salve o cadastro aqui ou recarregue para sincronizar automaticamente.
+                    Copie o script acima, acesse o painel do seu Supabase, clique em <strong>SQL Editor</strong>, cole o código e execute clicando em <strong>Run</strong>. Em seguida, salve os cadastros aqui ou recarregue para sincronizar automaticamente.
                   </p>
                 </div>
               )}
