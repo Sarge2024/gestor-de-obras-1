@@ -367,7 +367,7 @@ export default function App() {
         {/* Footer */}
         <footer className="mt-auto p-6 border-t border-[#c0c7d6] bg-[#f2f4f6] text-center text-body-sm text-[#707785]">
           <p>
-            © {new Date().getFullYear()} Systems Storage - Supplier Management System. Todos os direitos reservados.
+            © {new Date().getFullYear()} Works Manager - Supplier Management System. Todos os direitos reservados.
           </p>
         </footer>
       </div>

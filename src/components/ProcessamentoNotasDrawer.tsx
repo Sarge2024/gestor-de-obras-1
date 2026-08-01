@@ -182,7 +182,7 @@ export const ProcessamentoNotasDrawer: React.FC<ProcessamentoNotasDrawerProps> =
                     3. Compliance Técnico & Vínculo com Contrato
                   </p>
                   <p className="text-body-sm text-[#404753]">
-                    Em análise pelo departamento financeiro da Systems Storage.
+                    Em análise pelo departamento financeiro da Works Manager.
                   </p>
                 </div>
 

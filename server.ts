@@ -726,7 +726,7 @@ async function startServer() {
       const ai = new GoogleGenAI({ apiKey });
       const { month, dreData } = req.body || {};
 
-      const prompt = `Você é um analista financeiro sênior para o portal de fornecedores Systems Storage.
+      const prompt = `Você é um analista financeiro sênior para o portal de fornecedores Works Manager.
 Analise os seguintes dados do DRE do mês de ${month || 'Junho'}:
 ${JSON.stringify(dreData || [], null, 2)}
 

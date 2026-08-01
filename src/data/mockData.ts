@@ -3,7 +3,7 @@ import { UserProfile, ContractItem, InvoiceItem, PendingPayment, DRELine, Activi
 export const initialProfile: UserProfile = {
   name: 'Logística Global SA',
   role: 'Gerente Financeiro',
-  company: 'Systems Storage',
+  company: 'Works Manager',
   tier: 'FORNECEDOR PREMIUM',
   avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDYTkaT4oqHI3epkFmjUHf3FoYmFFxf7-tIzV1Dui-w2ZiBkkz_9yREkYJFAplvWZMdZN3_XkW9IXVgnh2kdfylcELIbm9u_TrK15pbr9cFDz0d-1SQ5MboH3SW4KlTYN4_FK_AupZB8yAIykyop0yL9oEt1ujjkHjZqyPOlklMxdCpPpxksBdOocSOmjajGzr3A2RXMQuuVHsymLQ3h0yIidBQHh420byLVxOyZGewaw8TjfDXrz9r',
   email: 'financeiro@logisticsglobal.com.br'
