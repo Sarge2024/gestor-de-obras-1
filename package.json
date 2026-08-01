@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Sarge2024/Gestor-de-Obras.git"
+    "url": "https://github.com/sagacitassistemas-sudo/gestor-de-obras.git"
   },
   "type": "module",
   "scripts": {

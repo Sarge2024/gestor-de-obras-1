@@ -177,7 +177,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Footer Actions */}
         <div className="mt-auto pt-4 border-t border-[#c0c7d6] space-y-1">
           <a
-            href="https://github.com/Sarge2024/Gestor-de-Obras"
+            href="https://github.com/sagacitassistemas-sudo/gestor-de-obras"
             target="_blank"
             rel="noopener noreferrer"
             className="w-full mb-2 p-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 text-[11px] font-mono font-bold flex items-center justify-between border border-slate-200 transition-colors"
@@ -185,7 +185,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <span className="flex items-center gap-1.5 truncate">
               <span className="material-symbols-outlined text-sm text-slate-800">code</span>
-              <span className="truncate">Sarge2024/Gestor-de-Obras</span>
+              <span className="truncate">Sagacitassistemas-sudo/Gestor-de-Obras</span>
             </span>
             <span className="material-symbols-outlined text-xs text-slate-500">open_in_new</span>
           </a>
