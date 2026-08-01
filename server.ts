@@ -197,7 +197,8 @@ async function startServer() {
       try {
         customToken = await getAdminAuth().createCustomToken(uid, customClaims);
       } catch (tokErr) {
-        customToken = `mock_oauth_jwt_${uid}_${Date.now()}`;
+        const payloadStr = JSON.stringify({ uid, email: userEmail, customClaims });
+        customToken = `mock_jwt_${Buffer.from(payloadStr).toString("base64")}`;
       }
 
       return res.json({
@@ -276,7 +277,8 @@ async function startServer() {
       try {
         customToken = await getAdminAuth().createCustomToken(uid, customClaims);
       } catch (tokErr) {
-        customToken = `mock_custom_jwt_${uid}_${Date.now()}`;
+        const payloadStr = JSON.stringify({ uid, email, customClaims });
+        customToken = `mock_jwt_${Buffer.from(payloadStr).toString("base64")}`;
       }
 
       activeMFAChallenges.delete(mfaTicket);

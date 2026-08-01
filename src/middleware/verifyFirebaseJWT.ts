@@ -13,6 +13,26 @@ export async function verifyFirebaseJWT(req: AuthenticatedRequest, res: Response
   // Em ambiente de desenvolvimento local, permitimos bypass para tokens mockados
   if (process.env.NODE_ENV !== 'production' && idToken.startsWith('mock_')) {
     const isFornecedor = req.headers['x-mock-fornecedor'] === 'true' || req.query.perfil === 'FORNECEDOR';
+    
+    if (idToken.startsWith('mock_jwt_')) {
+      try {
+        const payloadBase64 = idToken.substring('mock_jwt_'.length);
+        const payload = JSON.parse(Buffer.from(payloadBase64, 'base64').toString('utf-8'));
+        req.decodedToken = {
+          uid: payload.uid || 'usr_demo_2026',
+          email: payload.email || 'financeiro@logisticsglobal.com.br',
+          contrato_id: payload.customClaims?.contrato_id || 'CTR-2026-SYS',
+          empresa_id: payload.customClaims?.empresa_id || 'SUP-9823-STORAGE',
+          entidade_id: payload.customClaims?.entidade_id || 'SUP-9823-STORAGE',
+          perfil: payload.customClaims?.perfil || 'FINANCEIRO',
+          mfa_verified: !!payload.customClaims?.mfa_verified
+        };
+        return next();
+      } catch (e) {
+        console.warn("[middleware.verifyFirebaseJWT] Falha ao decodificar token mock estruturado, usando fallback padrão.", e);
+      }
+    }
+
     req.decodedToken = {
       uid: 'usr_demo_2026',
       email: isFornecedor ? 'fornecedor@logistica.com.br' : 'financeiro@logisticsglobal.com.br',
