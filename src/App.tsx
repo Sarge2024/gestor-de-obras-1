@@ -85,6 +85,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    setAuthSession(null);
     setIsAuthenticated(false);
     setActiveTab('login');
   };
@@ -180,39 +181,6 @@ export default function App() {
   if (!isAuthenticated || activeTab === 'login') {
     return (
       <>
-        {/* Quick Screen Switcher Bar for Preview Convenience */}
-        <div className="bg-[#005daa] text-white py-1.5 px-4 text-[12px] flex items-center justify-between font-label-bold z-50">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[16px]">view_carousel</span>
-            <span>Alternar Telas:</span>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setActiveTab('login')}
-              className={`px-2.5 py-0.5 rounded transition-colors ${
-                activeTab === 'login' ? 'bg-white text-[#005daa] font-bold' : 'hover:bg-white/10'
-              }`}
-            >
-              Login + 2FA
-            </button>
-            <button
-              onClick={() => setActiveTab('onboarding')}
-              className="px-2.5 py-0.5 rounded hover:bg-white/10"
-            >
-              Onboarding Convite
-            </button>
-            <button
-              onClick={() => {
-                setIsAuthenticated(true);
-                setActiveTab('dashboard');
-              }}
-              className="px-2.5 py-0.5 rounded hover:bg-white/10"
-            >
-              Dashboard
-            </button>
-          </div>
-        </div>
-
         <LoginScreen
           onLoginSuccess={handleLoginSuccess}
           onOpenSupportModal={() => setIsNovoChamadoOpen(true)}
