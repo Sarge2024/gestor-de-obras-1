@@ -1,0 +1,6 @@
+{
+  "name": "Gestor de Obras",
+  "description": "Sistema de Gestão de Obras, Infraestrutura, Fornecedores e Contratos (Sarge2024/Gestor-de-Obras).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

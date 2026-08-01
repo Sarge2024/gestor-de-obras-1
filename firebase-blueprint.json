@@ -1,0 +1,110 @@
+{
+  "collections": {
+    "contratos": {
+      "description": "Infraestrutura: Cadastro de Contratos Tenants Master SaaS",
+      "fields": {
+        "codigo_contrato": { "type": "string", "required": true },
+        "razao_social": { "type": "string", "required": true },
+        "plano": { "type": "string", "required": true },
+        "status": { "type": "string", "required": true },
+        "createdAt": { "type": "string", "required": true }
+      }
+    },
+    "empresas": {
+      "description": "Infraestrutura: Cadastro de Fornecedores, Clientes e Empresas do Ecossistema",
+      "fields": {
+        "nome": { "type": "string", "required": true },
+        "cnpj_cpf": { "type": "string", "required": true },
+        "tipo": { "type": "string", "required": true },
+        "contrato_id": { "type": "string", "required": true },
+        "createdAt": { "type": "string", "required": true }
+      }
+    },
+    "entidades": {
+      "description": "Infraestrutura: Alias de Legado para Cadastro de Fornecedores e Empresas",
+      "fields": {
+        "nome": { "type": "string", "required": true },
+        "cnpj_cpf": { "type": "string", "required": true },
+        "tipo": { "type": "string", "required": true },
+        "contrato_id": { "type": "string", "required": true },
+        "createdAt": { "type": "string", "required": true }
+      }
+    },
+    "usuarios": {
+      "description": "Infraestrutura: Usuários e seus perfis com vincularidade intra-contrato",
+      "fields": {
+        "email": { "type": "string", "required": true },
+        "displayName": { "type": "string", "required": false },
+        "contrato_id": { "type": "string", "required": true },
+        "empresa_id": { "type": "string", "required": true },
+        "entidade_id": { "type": "string", "required": false },
+        "perfil": { "type": "string", "required": true },
+        "mfaEnabled": { "type": "boolean", "required": true },
+        "createdAt": { "type": "string", "required": true }
+      }
+    },
+    "usuario_contrato": {
+      "description": "Infraestrutura: Tabela associativa de privilégios e vínculos intra-contrato",
+      "fields": {
+        "usuario_id": { "type": "string", "required": true },
+        "contrato_id": { "type": "string", "required": true },
+        "empresa_id": { "type": "string", "required": true },
+        "entidade_id": { "type": "string", "required": false },
+        "perfil": { "type": "string", "required": true },
+        "ativo": { "type": "boolean", "required": true },
+        "criado_em": { "type": "string", "required": true }
+      }
+    },
+    "lancamentos_financeiros": {
+      "description": "Negócio: Lançamentos Financeiros com isolamento estrito por contrato_id e fornecedor_id",
+      "fields": {
+        "contrato_id": { "type": "string", "required": true },
+        "fornecedor_id": { "type": "string", "required": true },
+        "descricao": { "type": "string", "required": true },
+        "valor": { "type": "number", "required": true },
+        "tipo": { "type": "string", "required": true },
+        "status": { "type": "string", "required": true },
+        "data_vencimento": { "type": "string", "required": true },
+        "criado_por": { "type": "string", "required": true },
+        "createdAt": { "type": "string", "required": true }
+      }
+    },
+    "pagamentos": {
+      "description": "Negócio: Pagamentos e Faturamentos Intra-Contrato",
+      "fields": {
+        "contrato_id": { "type": "string", "required": true },
+        "fornecedor_id": { "type": "string", "required": true },
+        "descricao": { "type": "string", "required": true },
+        "valor": { "type": "number", "required": true },
+        "status": { "type": "string", "required": true },
+        "data_vencimento": { "type": "string", "required": true },
+        "createdAt": { "type": "string", "required": true }
+      }
+    },
+    "medicoes": {
+      "description": "Negócio: Medições e Boletins de Serviços de Fornecedores",
+      "fields": {
+        "contrato_id": { "type": "string", "required": true },
+        "fornecedor_id": { "type": "string", "required": true },
+        "numero_boletim": { "type": "string", "required": true },
+        "periodo": { "type": "string", "required": true },
+        "valor_aprovado": { "type": "number", "required": true },
+        "status": { "type": "string", "required": true },
+        "createdAt": { "type": "string", "required": true }
+      }
+    },
+    "invites": {
+      "description": "Infraestrutura: Convites de Onboarding por E-mail",
+      "fields": {
+        "email": { "type": "string", "required": true },
+        "contrato_id": { "type": "string", "required": true },
+        "empresa_id": { "type": "string", "required": true },
+        "entidade_id": { "type": "string", "required": false },
+        "perfil": { "type": "string", "required": true },
+        "inviteToken": { "type": "string", "required": true },
+        "status": { "type": "string", "required": true },
+        "createdAt": { "type": "string", "required": true }
+      }
+    }
+  }
+}

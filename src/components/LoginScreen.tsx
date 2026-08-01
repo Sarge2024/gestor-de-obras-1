@@ -1,0 +1,464 @@
+import React, { useState } from 'react';
+import { MFAModal } from './MFAModal';
+import { AuthSession } from '../types';
+
+interface LoginScreenProps {
+  onLoginSuccess: (session: AuthSession) => void;
+  onOpenSupportModal?: () => void;
+  onOpenOnboarding?: () => void;
+}
+
+export const LoginScreen: React.FC<LoginScreenProps> = ({
+  onLoginSuccess,
+  onOpenSupportModal,
+  onOpenOnboarding
+}) => {
+  const [email, setEmail] = useState('financeiro@logisticsglobal.com.br');
+  const [password, setPassword] = useState('••••••••');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [forgotModalOpen, setForgotModalOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSubmitted, setForgotSubmitted] = useState(false);
+
+  // 2FA MFA State
+  const [mfaModalOpen, setMfaModalOpen] = useState(false);
+  const [mfaTicket, setMfaTicket] = useState('');
+  const [otpCodeDemo, setOtpCodeDemo] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const res = await fetch('/api/auth/login-mfa-step1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await res.json();
+      setIsLoading(false);
+
+      if (res.ok && data.mfaRequired) {
+        setMfaTicket(data.mfaTicket);
+        setOtpCodeDemo(data.otpCodeDemo);
+        setMfaModalOpen(true);
+      } else if (!res.ok) {
+        setErrorMessage(data.error || 'Erro na autenticação.');
+      }
+    } catch (err) {
+      setIsLoading(false);
+      // Fallback for prototype offline or quick demo
+      setMfaTicket(`mfa_demo_${Date.now()}`);
+      setOtpCodeDemo('849201');
+      setMfaModalOpen(true);
+    }
+  };
+
+  const handleMfaVerifySuccess = (sessionData: AuthSession) => {
+    setMfaModalOpen(false);
+    onLoginSuccess(sessionData);
+  };
+
+  const handleForgotSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotSubmitted(true);
+    setTimeout(() => {
+      setForgotSubmitted(false);
+      setForgotModalOpen(false);
+    }, 2000);
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 bg-[#f7f9fb] relative overflow-hidden font-body-md text-[#191c1e]">
+      {/* Ambient Background Blur Blobs */}
+      <div className="absolute top-[-10%] left-[-10%] w-[45%] h-[45%] rounded-full bg-[#005daa]/5 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[45%] h-[45%] rounded-full bg-[#4b41e1]/5 blur-[120px] pointer-events-none" />
+
+      {/* Main Login Screen Layout */}
+      <div className="w-full max-w-[1100px] z-10 flex items-center justify-center lg:justify-between gap-12 my-8">
+        
+        {/* Left/Center Login Container */}
+        <main className="w-full max-w-[480px] animate-in fade-in zoom-in duration-500">
+          {/* Brand Header */}
+          <div className="flex flex-col items-center mb-8">
+            <div className="mb-4 p-3 bg-white border border-[#c0c7d6] rounded-xl shadow-2xs flex items-center justify-center">
+              <span className="material-symbols-outlined text-[#005daa] text-4xl">hub</span>
+            </div>
+            <h1 className="font-headline-md text-headline-md text-[#005daa] tracking-tight">
+              Systems Storage
+            </h1>
+            <p className="font-body-md text-[#404753] mt-1.5 text-center">
+              Supplier Portal Infrastructure
+            </p>
+          </div>
+
+          {/* Login Card */}
+          <div className="bg-white border border-[#c0c7d6] rounded-xl shadow-sm p-8 md:p-10 relative">
+            <header className="mb-8">
+              <div className="flex justify-between items-center mb-2">
+                <h2 className="font-headline-sm text-headline-sm text-[#191c1e]">
+                  Seja bem-vindo.
+                </h2>
+                <span className="text-[10px] font-bold text-[#005daa] bg-[#eff6ff] px-2 py-0.5 rounded border border-[#005daa]/20">
+                  Container Firebase Auth
+                </span>
+              </div>
+              <p className="font-body-sm text-[#404753]">
+                Acesse sua conta para gerenciar contratos e faturamentos com autenticação OAuth SSO ou Duplo Fator (2FA).
+              </p>
+            </header>
+
+            {/* OAuth Identity Providers (Principal Auth Flow) */}
+            <div className="space-y-3 mb-6">
+              <p className="font-label-bold text-[11px] text-[#404753] uppercase tracking-wider">
+                Autenticação Principal via Identity Provider (OAuth)
+              </p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={async () => {
+                    setIsLoading(true);
+                    setErrorMessage('');
+                    try {
+                      const res = await fetch('/api/auth/oauth-login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ provider: 'google' })
+                      });
+                      const data = await res.json();
+                      setIsLoading(false);
+                      if (res.ok && data.session) {
+                        onLoginSuccess(data.session);
+                      } else {
+                        setErrorMessage(data.error || 'Erro no login Google OAuth');
+                      }
+                    } catch (e) {
+                      setIsLoading(false);
+                      setErrorMessage('Falha na autenticação Google OAuth');
+                    }
+                  }}
+                  className="w-full py-2.5 px-3 bg-white border border-[#c0c7d6] hover:bg-[#f8fafc] rounded-md font-label-bold text-xs text-[#1e293b] transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                  <span>Entrar com Google</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={async () => {
+                    setIsLoading(true);
+                    setErrorMessage('');
+                    try {
+                      const res = await fetch('/api/auth/oauth-login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ provider: 'microsoft' })
+                      });
+                      const data = await res.json();
+                      setIsLoading(false);
+                      if (res.ok && data.session) {
+                        onLoginSuccess(data.session);
+                      } else {
+                        setErrorMessage(data.error || 'Erro no login Microsoft OAuth');
+                      }
+                    } catch (e) {
+                      setIsLoading(false);
+                      setErrorMessage('Falha na autenticação Microsoft OAuth');
+                    }
+                  }}
+                  className="w-full py-2.5 px-3 bg-white border border-[#c0c7d6] hover:bg-[#f8fafc] rounded-md font-label-bold text-xs text-[#1e293b] transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 23 23">
+                    <path fill="#f35325" d="M1 1h10v10H1z" />
+                    <path fill="#81bc06" d="M12 1h10v10H12z" />
+                    <path fill="#05a6f0" d="M1 12h10v10H1z" />
+                    <path fill="#ffba08" d="M12 12h10v10H12z" />
+                  </svg>
+                  <span>Microsoft SSO</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="relative flex py-2 items-center">
+              <div className="flex-grow border-t border-[#e2e8f0]"></div>
+              <span className="flex-shrink mx-3 font-label-bold text-[10px] text-[#94a3b8] uppercase">
+                ou acesse com e-mail (fallback manual)
+              </span>
+              <div className="flex-grow border-t border-[#e2e8f0]"></div>
+            </div>
+
+            {errorMessage && (
+              <div className="mb-4 p-3 bg-[#fef2f2] border border-[#ef4444]/30 rounded-md text-[#ef4444] text-body-sm font-bold flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px]">error</span>
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            <form className="space-y-6" onSubmit={handleSubmit}>
+              {/* Email Input */}
+              <div className="space-y-2">
+                <label className="font-label-bold text-label-bold text-[#191c1e] block" htmlFor="email">
+                  E-mail corporativo
+                </label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#707785] text-[20px] select-none">
+                    mail
+                  </span>
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="exemplo@empresa.com.br"
+                    required
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-[#c0c7d6] rounded-md font-body-md text-[#191c1e] placeholder:text-[#707785] focus:ring-2 focus:ring-[#005daa]/20 focus:border-[#005daa] transition-all outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Password Input */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="font-label-bold text-label-bold text-[#191c1e]" htmlFor="password">
+                    Senha
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setForgotModalOpen(true)}
+                    className="font-label-bold text-label-bold text-[#005daa] hover:underline transition-all"
+                  >
+                    Esqueceu a senha?
+                  </button>
+                </div>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#707785] text-[20px] select-none">
+                    lock
+                  </span>
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-[#c0c7d6] rounded-md font-body-md text-[#191c1e] placeholder:text-[#707785] focus:ring-2 focus:ring-[#005daa]/20 focus:border-[#005daa] transition-all outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#707785] hover:text-[#191c1e] transition-colors p-1"
+                  >
+                    <span className="material-symbols-outlined text-[20px] select-none">
+                      {showPassword ? 'visibility_off' : 'visibility'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Remember Me */}
+              <div className="flex items-center gap-2.5">
+                <input
+                  id="remember"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 text-[#005daa] border-[#c0c7d6] rounded focus:ring-[#005daa] cursor-pointer"
+                />
+                <label htmlFor="remember" className="font-body-sm text-[#404753] cursor-pointer select-none">
+                  Lembrar deste dispositivo com 2FA ativo
+                </label>
+              </div>
+
+              {/* CTA Button */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-4 bg-[#005daa] text-white rounded-md font-label-bold text-label-bold hover:bg-[#0075d5] active:scale-[0.98] transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-80 group cursor-pointer"
+              >
+                {isLoading ? (
+                  <>
+                    <span className="material-symbols-outlined animate-spin text-[20px]">sync</span>
+                    <span>Iniciando 2FA...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[20px]">lock_open</span>
+                    <span>Acessar com Duplo Fator (2FA)</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Onboarding & Demo Helper Links */}
+            <div className="mt-6 pt-4 border-t border-[#e2e8f0] space-y-2">
+              <button
+                type="button"
+                onClick={onOpenOnboarding}
+                className="w-full py-2.5 px-3 bg-[#f0fdf4] text-[#10b981] hover:bg-[#dcfce7] border border-[#10b981]/30 rounded-md font-label-bold text-[12px] transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">how_to_reg</span>
+                <span>Onboarding de Novo Usuário (Recebeu Convite?)</span>
+              </button>
+            </div>
+
+            {/* Footer Help */}
+            <div className="mt-8 pt-6 border-t border-[#c0c7d6] flex flex-col items-center gap-4">
+              <p className="font-body-sm text-[#404753]">Problemas com o acesso?</p>
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={onOpenSupportModal}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#f2f4f6] hover:bg-[#eceef0] border border-[#c0c7d6] rounded-md transition-colors font-label-bold text-label-bold text-[#404753] cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">support_agent</span>
+                  Suporte
+                </button>
+                <a
+                  href="https://wa.me/5511999999999?text=Preciso%20de%20suporte%20no%20Portal%20Systems%20Storage"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2 bg-[#f2f4f6] hover:bg-[#eceef0] border border-[#c0c7d6] rounded-md transition-colors font-label-bold text-label-bold text-[#404753]"
+                >
+                  <span className="material-symbols-outlined text-[18px]">chat</span>
+                  WhatsApp
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Trust Badges */}
+          <div className="mt-8 flex justify-center items-center gap-8 opacity-70">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px] text-[#10b981]">verified_user</span>
+              <span className="font-body-sm text-[#404753]">Acesso Seguro SSL</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px] text-[#005daa]">policy</span>
+              <span className="font-body-sm text-[#404753]">LGPD Compliant</span>
+            </div>
+          </div>
+        </main>
+
+        {/* Right Side Graphic Widget (Desktop Only) */}
+        <div className="hidden lg:block relative w-[380px]">
+          <div className="bg-white border border-[#c0c7d6] rounded-xl shadow-lg p-6 animate-float relative z-10">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-headline-sm text-headline-sm text-[#005daa]">Container de Autenticação</h3>
+              <span className="px-2.5 py-1 bg-[#ecfdf5] text-[#10b981] rounded font-label-bold text-label-bold border border-[#10b981]/20">
+                Ativo
+              </span>
+            </div>
+            <div className="space-y-4">
+              <div className="p-3 bg-[#f2f4f6] rounded-lg border border-[#c0c7d6]/60">
+                <p className="font-body-sm text-[#707785] mb-1">Custom Claims no Token</p>
+                <p className="font-metric-mono text-xs text-[#005daa] font-bold">
+                  contrato_id | entidade_id | perfil
+                </p>
+              </div>
+              <div className="p-3 bg-[#f2f4f6] rounded-lg border border-[#c0c7d6]/60">
+                <p className="font-body-sm text-[#707785] mb-1">Segurança</p>
+                <p className="font-metric-mono text-xs text-[#10b981] font-bold">
+                  Duplo Fator (2FA) Obrigatório
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2FA MFA Verification Modal */}
+      <MFAModal
+        isOpen={mfaModalOpen}
+        email={email}
+        mfaTicket={mfaTicket}
+        otpCodeDemo={otpCodeDemo}
+        onVerifySuccess={handleMfaVerifySuccess}
+        onCancel={() => setMfaModalOpen(false)}
+      />
+
+      {/* Forgot Password Modal */}
+      {forgotModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 border border-[#c0c7d6] shadow-xl animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-headline-sm text-[#005daa]">Recuperar Senha</h3>
+              <button
+                onClick={() => setForgotModalOpen(false)}
+                className="text-[#707785] hover:text-[#191c1e]"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            {forgotSubmitted ? (
+              <div className="p-4 bg-[#ecfdf5] border border-[#10b981]/30 rounded-lg text-center space-y-2">
+                <span className="material-symbols-outlined text-[#10b981] text-3xl">check_circle</span>
+                <p className="font-bold text-[#10b981]">Instruções enviadas!</p>
+                <p className="text-body-sm text-[#404753]">
+                  Verifique sua caixa de entrada no e-mail informado para redefinir sua senha.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleForgotSubmit} className="space-y-4">
+                <p className="text-body-sm text-[#404753]">
+                  Informe seu e-mail corporativo cadastrado para receber um link de redefinição de acesso.
+                </p>
+                <div>
+                  <label className="font-label-bold text-[#191c1e] block mb-1">E-mail corporativo</label>
+                  <input
+                    type="email"
+                    required
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="seu.email@empresa.com.br"
+                    className="w-full px-3.5 py-2.5 border border-[#c0c7d6] rounded-md font-body-md text-[#191c1e] outline-none focus:border-[#005daa]"
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setForgotModalOpen(false)}
+                    className="px-4 py-2 border border-[#c0c7d6] rounded-md font-label-bold text-[#404753] hover:bg-[#f2f4f6]"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-[#005daa] text-white rounded-md font-label-bold hover:bg-[#0075d5]"
+                  >
+                    Enviar Link
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+

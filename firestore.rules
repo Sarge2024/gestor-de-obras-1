@@ -1,0 +1,143 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper Functions para Validação e Isolamento Intra-Contrato
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getContratoId() {
+      return request.auth.token.contrato_id;
+    }
+
+    function getEmpresaId() {
+      return request.auth.token.empresa_id != null ? request.auth.token.empresa_id : request.auth.token.entidade_id;
+    }
+
+    function getEntidadeId() {
+      return getEmpresaId();
+    }
+
+    function getPerfil() {
+      return request.auth.token.perfil;
+    }
+
+    function isFinanceiro() {
+      return isAuthenticated() && (getPerfil() == 'FINANCEIRO' || getPerfil() == 'ADMIN' || getPerfil() == 'GESTOR');
+    }
+
+    function isFornecedor() {
+      return isAuthenticated() && getPerfil() == 'FORNECEDOR';
+    }
+
+    // ========================================================
+    // COLEÇÃO DE NEGÓCIO: lancamentos_financeiros, pagamentos, medicoes
+    // ========================================================
+    match /lancamentos_financeiros/{docId} {
+      allow read: if isAuthenticated() && (
+        (isFinanceiro() && resource.data.contrato_id == getContratoId()) ||
+        (isFornecedor() && resource.data.contrato_id == getContratoId() && resource.data.fornecedor_id == getEmpresaId())
+      );
+      allow create: if isAuthenticated() && (
+        (isFinanceiro() && request.resource.data.contrato_id == getContratoId()) ||
+        (isFornecedor() && request.resource.data.contrato_id == getContratoId() && request.resource.data.fornecedor_id == getEmpresaId())
+      );
+      allow update, delete: if isAuthenticated() && (
+        (isFinanceiro() && resource.data.contrato_id == getContratoId() && request.resource.data.contrato_id == getContratoId()) ||
+        (isFornecedor() && resource.data.contrato_id == getContratoId() && resource.data.fornecedor_id == getEmpresaId() && request.resource.data.contrato_id == getContratoId() && request.resource.data.fornecedor_id == getEmpresaId())
+      );
+    }
+
+    match /pagamentos/{docId} {
+      allow read: if isAuthenticated() && (
+        (isFinanceiro() && resource.data.contrato_id == getContratoId()) ||
+        (isFornecedor() && resource.data.contrato_id == getContratoId() && resource.data.fornecedor_id == getEmpresaId())
+      );
+      allow create: if isAuthenticated() && (
+        (isFinanceiro() && request.resource.data.contrato_id == getContratoId()) ||
+        (isFornecedor() && request.resource.data.contrato_id == getContratoId() && request.resource.data.fornecedor_id == getEmpresaId())
+      );
+      allow update, delete: if isAuthenticated() && (
+        (isFinanceiro() && resource.data.contrato_id == getContratoId() && request.resource.data.contrato_id == getContratoId()) ||
+        (isFornecedor() && resource.data.contrato_id == getContratoId() && resource.data.fornecedor_id == getEmpresaId() && request.resource.data.contrato_id == getContratoId() && request.resource.data.fornecedor_id == getEmpresaId())
+      );
+    }
+
+    match /medicoes/{docId} {
+      allow read: if isAuthenticated() && (
+        (isFinanceiro() && resource.data.contrato_id == getContratoId()) ||
+        (isFornecedor() && resource.data.contrato_id == getContratoId() && resource.data.fornecedor_id == getEmpresaId())
+      );
+      allow create: if isAuthenticated() && (
+        (isFinanceiro() && request.resource.data.contrato_id == getContratoId()) ||
+        (isFornecedor() && request.resource.data.contrato_id == getContratoId() && request.resource.data.fornecedor_id == getEmpresaId())
+      );
+      allow update, delete: if isAuthenticated() && (
+        (isFinanceiro() && resource.data.contrato_id == getContratoId() && request.resource.data.contrato_id == getContratoId()) ||
+        (isFornecedor() && resource.data.contrato_id == getContratoId() && resource.data.fornecedor_id == getEmpresaId() && request.resource.data.contrato_id == getContratoId() && request.resource.data.fornecedor_id == getEmpresaId())
+      );
+    }
+
+    // ========================================================
+    // COLEÇÕES DE INFRAESTRUTURA ISOLADAS
+    // ========================================================
+
+    // 1. Coleção: contratos
+    match /contratos/{contratoId} {
+      allow read: if isAuthenticated() && (contratoId == getContratoId() || resource.data.codigo_contrato == getContratoId());
+      // Blindagem: Alteração de contrato master proibida via cliente
+      allow write: if false;
+    }
+
+    // 2. Coleção: empresas (Empresas / Fornecedores)
+    match /empresas/{empresaId} {
+      allow read: if isAuthenticated() && (
+        (isFinanceiro() && resource.data.contrato_id == getContratoId()) ||
+        (isFornecedor() && empresaId == getEmpresaId() && resource.data.contrato_id == getContratoId())
+      );
+      allow write: if isFinanceiro() && request.resource.data.contrato_id == getContratoId();
+    }
+
+    // 2b. Coleção: entidades (Alias para compatibilidade)
+    match /entidades/{entidadeId} {
+      allow read: if isAuthenticated() && (
+        (isFinanceiro() && resource.data.contrato_id == getContratoId()) ||
+        (isFornecedor() && entidadeId == getEmpresaId() && resource.data.contrato_id == getContratoId())
+      );
+      allow write: if isFinanceiro() && request.resource.data.contrato_id == getContratoId();
+    }
+
+    // 3. Coleção: usuarios (Perfis e Dados Cadastrais)
+    match /usuarios/{userId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        (isFinanceiro() && resource.data.contrato_id == getContratoId())
+      );
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      // Blindagem de Privilégios: Usuário não pode elevar próprio perfil ou trocar contrato/empresa
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == userId &&
+         request.resource.data.perfil == resource.data.perfil &&
+         request.resource.data.contrato_id == resource.data.contrato_id) ||
+        (isFinanceiro() && resource.data.contrato_id == getContratoId())
+      );
+      allow delete: if false;
+    }
+
+    // 4. Coleção: usuario_contrato (Tabela Associativa Intra-Contrato)
+    match /usuario_contrato/{ucId} {
+      allow read: if isAuthenticated() && (
+        resource.data.usuario_id == request.auth.uid ||
+        (isFinanceiro() && resource.data.contrato_id == getContratoId())
+      );
+      allow write: if isFinanceiro() && request.resource.data.contrato_id == getContratoId();
+    }
+
+    // 5. Coleção: invites (Convites de Onboarding)
+    match /invites/{inviteId} {
+      allow read: if true;
+      allow write: if isFinanceiro();
+    }
+  }
+}
