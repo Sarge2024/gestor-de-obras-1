@@ -45,24 +45,9 @@ import { NotificationsDrawer } from './components/NotificationsDrawer';
 import { ExportReportModal } from './components/ExportReportModal';
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
-  const [activeTab, setActiveTab] = useState<NavigationTab>('dashboard');
-  const [authSession, setAuthSession] = useState<AuthSession | null>({
-    uid: 'usr_demo_2026',
-    email: 'financeiro@logisticsglobal.com.br',
-    displayName: 'Carlos Eduardo',
-    customClaims: {
-      contrato_id: 'CTR-2026-SYS',
-      empresa_id: 'SUP-9823-STORAGE',
-      entidade_id: 'SUP-9823-STORAGE',
-      perfil: 'FINANCEIRO',
-      mfa_verified: true
-    },
-    idToken: 'mock_jwt_token_claims_active',
-    mfaVerified: true,
-    mfaMethod: 'EMAIL_OTP',
-    lastLoginAt: new Date().toISOString()
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [activeTab, setActiveTab] = useState<NavigationTab>('login');
+  const [authSession, setAuthSession] = useState<AuthSession | null>(null);
 
   const [isAuthDebugOpen, setIsAuthDebugOpen] = useState(false);
 
