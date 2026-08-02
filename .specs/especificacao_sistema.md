@@ -136,3 +136,4 @@ Central de controle B2B para homologação, checagem cadastral, e auditoria docu
 
 ### 4.5. Matriz de Acessos (`MatrizAcessosView`)
 Painel interativo que renderiza a matriz `perfis_permissoes` do banco PostgreSQL do tenant, permitindo a usuários `ADMIN` customizar as flags de autorização RBAC aplicadas a cada classe de perfil diretamente na UI.
+
