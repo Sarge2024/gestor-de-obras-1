@@ -117,7 +117,7 @@ export const Header: React.FC<HeaderProps> = ({
                 {user.name}
               </p>
               <p className="text-[10px] text-[#707785] font-semibold uppercase tracking-wider">
-                {user.tier}
+                {user.role}
               </p>
             </div>
             <div className="h-9 w-9 rounded-full bg-[#d4e3ff] p-0.5 border border-[#005daa]/20 overflow-hidden shadow-2xs flex-shrink-0">

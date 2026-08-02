@@ -82,7 +82,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       <div className="absolute bottom-[-10%] right-[-10%] w-[45%] h-[45%] rounded-full bg-[#4b41e1]/5 blur-[120px] pointer-events-none" />
 
       {/* Main Login Screen Layout */}
-      <div className="w-full max-w-[1100px] z-10 flex items-center justify-center lg:justify-between gap-12 my-8">
+      <div className="w-full max-w-[1100px] z-10 flex items-center justify-center my-8">
         
         {/* Left/Center Login Container */}
         <main className="w-full max-w-[480px] animate-in fade-in zoom-in duration-500">
@@ -400,31 +400,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </div>
         </main>
 
-        {/* Right Side Graphic Widget (Desktop Only) */}
-        <div className="hidden lg:block relative w-[380px]">
-          <div className="bg-white border border-[#c0c7d6] rounded-xl shadow-lg p-6 animate-float relative z-10">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="font-headline-sm text-headline-sm text-[#005daa]">Container de Autenticação</h3>
-              <span className="px-2.5 py-1 bg-[#ecfdf5] text-[#10b981] rounded font-label-bold text-label-bold border border-[#10b981]/20">
-                Ativo
-              </span>
-            </div>
-            <div className="space-y-4">
-              <div className="p-3 bg-[#f2f4f6] rounded-lg border border-[#c0c7d6]/60">
-                <p className="font-body-sm text-[#707785] mb-1">Custom Claims no Token</p>
-                <p className="font-metric-mono text-xs text-[#005daa] font-bold">
-                  contrato_id | entidade_id | perfil
-                </p>
-              </div>
-              <div className="p-3 bg-[#f2f4f6] rounded-lg border border-[#c0c7d6]/60">
-                <p className="font-body-sm text-[#707785] mb-1">Segurança</p>
-                <p className="font-metric-mono text-xs text-[#10b981] font-bold">
-                  Duplo Fator (2FA) Obrigatório
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+
       </div>
 
       {/* 2FA MFA Verification Modal */}

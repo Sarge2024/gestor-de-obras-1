@@ -94,8 +94,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             <div className="p-3 bg-[#f2f4f6] rounded-md border border-[#c0c7d6] flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold text-[#707785] uppercase">Nível de Fornecedor</p>
-                <p className="font-bold text-[#005daa]">{tier}</p>
+                <p className="text-[10px] font-bold text-[#707785] uppercase">Perfil de Acesso</p>
+                <p className="font-bold text-[#005daa]">{user.role}</p>
               </div>
               <span className="px-2.5 py-1 bg-[#d4e3ff] text-[#005daa] font-bold text-[10px] rounded">
                 SLA 99.9%
