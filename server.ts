@@ -188,11 +188,11 @@ async function startServer() {
         .single();
 
       if (userErr || !userData) {
-        return res.status(403).json({ error: "Usuário não autorizado. O administrador deve cadastrá-lo previamente no sistema." });
+        return res.status(403).json({ error: "Usuário não autorizado. O administrador deve cadastrá-lo previamente no sistema. Suporte: worksmanager.suporte@gmail.com" });
       }
 
       if (userData.status === 'BLOQUEADO' || userData.status === 'INATIVO') {
-        return res.status(403).json({ error: "Usuário bloqueado ou inativo. Contate o administrador." });
+        return res.status(403).json({ error: "Usuário bloqueado ou inativo. Contate o suporte em worksmanager.suporte@gmail.com" });
       }
 
       // Update Supabase user with the latest info from OAuth if they match

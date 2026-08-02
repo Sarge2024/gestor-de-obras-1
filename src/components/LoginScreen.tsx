@@ -354,15 +354,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
             {/* Footer Help */}
             <div className="mt-8 pt-6 border-t border-[#c0c7d6] flex flex-col items-center gap-4">
-              <p className="font-body-sm text-[#404753]">Problemas com o acesso?</p>
-              <div className="flex gap-4">
+              <p className="font-body-sm text-[#404753] text-center">
+                Problemas com o acesso ou precisa solicitar cadastro?<br/>
+                O suporte oficial é realizado através do e-mail:
+              </p>
+              <div className="flex gap-4 flex-wrap justify-center">
+                <a
+                  href="mailto:worksmanager.suporte@gmail.com"
+                  className="flex items-center gap-2 px-4 py-2 bg-[#f2f4f6] hover:bg-[#eceef0] border border-[#c0c7d6] rounded-md transition-colors font-label-bold text-label-bold text-[#404753]"
+                >
+                  <span className="material-symbols-outlined text-[18px]">mail</span>
+                  worksmanager.suporte@gmail.com
+                </a>
                 <button
                   type="button"
                   onClick={onOpenSupportModal}
                   className="flex items-center gap-2 px-4 py-2 bg-[#f2f4f6] hover:bg-[#eceef0] border border-[#c0c7d6] rounded-md transition-colors font-label-bold text-label-bold text-[#404753] cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px]">support_agent</span>
-                  Suporte
+                  Suporte Interno
                 </button>
                 <a
                   href="https://wa.me/5511999999999?text=Preciso%20de%20suporte%20no%20Portal%20Systems%20Storage"
