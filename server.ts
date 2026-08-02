@@ -36,11 +36,14 @@ const isFirestoreEnabled = () => {
 };
 
 // Initialize Supabase Client safely using environment variables
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.SUPABASE_URL?.replace(/^["']|["']$/g, '');
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.replace(/^["']|["']$/g, '');
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY?.replace(/^["']|["']$/g, '');
 
 let supabase: SupabaseClient | null = null;
+console.log("DEBUG: SUPABASE_URL length:", supabaseUrl ? supabaseUrl.length : 0);
+console.log("DEBUG: SUPABASE_URL starts with:", supabaseUrl ? supabaseUrl.substring(0, 5) : "none");
+console.log("DEBUG: SUPABASE_URL ends with quote?:", supabaseUrl ? supabaseUrl.endsWith('"') : false);
 if (supabaseUrl) {
   // Use the verified valid Anon Key if the Service Role Key is known to be invalid or missing,
   // ensuring the server can successfully connect and query the database tables.
@@ -115,7 +118,7 @@ activeInvites.set("INV-DEMO-2026", {
   createdAt: new Date().toISOString()
 });
 
-async function startServer() {
+function startServer() {
   const app = express();
   let PORT = Number(process.env.PORT) || 8500;
 
@@ -1188,12 +1191,14 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa"
-    });
-    app.use(vite.middlewares);
+    import("vite").then(({ createServer: createViteServer }) => {
+      createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa"
+      }).then((vite) => {
+        app.use(vite.middlewares);
+      });
+    }).catch(err => console.error("Failed to start Vite middleware:", err));
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
@@ -1227,17 +1232,7 @@ Forneça um insight conciso, profissional e prático em português (máximo 2 fr
   return app;
 }
 
-let appPromise: Promise<express.Express> | null = null;
+const appInstance = startServer();
 
-if (!process.env.VERCEL) {
-  startServer();
-}
-
-export default async function handler(req: any, res: any) {
-  if (!appPromise) {
-    appPromise = startServer();
-  }
-  const appInstance = await appPromise;
-  return appInstance(req, res);
-}
+export default appInstance;
 
