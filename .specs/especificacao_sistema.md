@@ -1,6 +1,6 @@
-# Especificação Completa do Sistema - Gestor de Obras
+# Especificação Completa do Sistema - Works Manager (Gestor de Obras)
 
-Este documento consolida a especificação técnica e funcional completa da plataforma **Gestor de Obras** na revisão atual. A plataforma é uma solução SaaS Multi-Tenant focada na gestão integrada de obras, infraestrutura, fornecedores, faturamentos (DRE) e contratos viários.
+Este documento consolida a especificação técnica e funcional completa da plataforma **Works Manager** (anteriormente Gestor de Obras) na revisão atual. A plataforma é uma solução SaaS Multi-Tenant focada na gestão integrada de obras, infraestrutura, fornecedores, faturamentos (DRE) e contratos viários.
 
 ---
 
@@ -8,30 +8,39 @@ Este documento consolida a especificação técnica e funcional completa da plat
 
 O sistema adota um modelo descentralizado de responsabilidades entre um **Container de Identidade (IdP)** e um **Sistema de Negócio Proprietário (Cerne)**.
 
-### 1.1. Camada de Autenticação (AuthN)
-- **Provedor de Identidade (IdP - Firebase Auth)**: Responsável exclusivamente por validar a identidade do usuário (e-mail/senha, OAuth SSO da Google/Microsoft e Duplo Fator de Autenticação - MFA).
-- **Custom Claims JWT**: O Firebase Auth injeta no token assinado do usuário as claims de identidade básicas estruturadas:
-  - `user_id`: Identificador exclusivo da conta.
+### 1.1. Camada de Autenticação (AuthN) & Whitelist de Usuários
+- **Provedor de Identidade (IdP - Firebase Auth)**: Responsável exclusivamente por autenticar a identidade do usuário (e-mail/senha, OAuth SSO da Google/Microsoft e Duplo Fator de Autenticação - MFA).
+- **Validação Estrita via Whitelist (`usuarios` Supabase)**: Ao realizar o login no endpoint `/api/auth/oauth-login`, o backend consulta a tabela `usuarios` no PostgreSQL/Supabase pelo e-mail autenticado.
+  - Usuários que **não** possuem cadastro prévio no banco recebem resposta HTTP 403 Forbidden ("Usuário não autorizado").
+  - Para usuários válidos e ativos, o backend sincroniza o `uid` e a `foto_url` obtidos do provedor OAuth.
+- **Custom Claims & Sessão**: O backend injeta as claims essenciais no token de sessão:
+  - `uid`: Identificador único da conta.
   - `contrato_id`: Identificador do tenant contratante principal (ex: `CTR-2026-SYS`).
   - `empresa_id` / `entidade_id`: Vínculo a uma empresa/fornecedor (ex: `SUP-9823-STORAGE`).
-  - `perfil`: Papel de navegação básica (`ADMIN`, `GESTOR`, `FINANCEIRO`, `FORNECEDOR`).
+  - `perfil`: Papel de navegação e permissão (`ADMIN`, `GESTOR`, `FINANCEIRO`, `FORNECEDOR`).
   - `mfa_verified`: Flag indicando validação de duplo fator.
 
-### 1.2. Camada de Autorização (AuthZ - Cerne)
+### 1.2. Camada de Autorização (AuthZ & Supabase JWT Assinado)
 - **Base Proprietária (PostgreSQL / Supabase)**: Assume 100% da responsabilidade sobre regras de negócio e autorização de operações CRUD.
-- **Validação de Token Stateless**: O backend (Express) intercepta os requests no middleware, decodifica o token Firebase usando criptografia assimétrica (chaves públicas JWKS em memória) e injeta o `contrato_id` (tenant) nas variáveis do cabeçalho da requisição. Nenhuma chamada HTTP (round-trip) ao Firebase é feita por requisição.
-- **Segurança de Acesso (Row-Level Security - RLS)**: O isolamento multitenant de dados é forçado a nível de banco de dados. O Supabase utiliza a variável `app.current_contrato_id` obtida do token verificado para restringir queries e mutações de tabelas transacionais de forma automática e segura.
-- **Zero Trust**: Nenhuma informação de identificação (como `contrato_id` ou `empresa_id`) é extraída do body ou query string para autorizar operações de escrita/leitura.
+- **Cliente Escopado por JWT (`getSupabaseClient`)**: O backend Express utiliza a biblioteca `jsonwebtoken` para assinar um JWT contendo as claims `{ role: 'authenticated', sub: uid, contrato_id, perfil }` usando o segredo `SUPABASE_JWT_SECRET`. Cada requisição a endpoints transacionais (como `/api/empresas`) inicializa um cliente Supabase com este token no cabeçalho `Authorization: Bearer <jwt>`.
+- **Segurança de Acesso (Row-Level Security - RLS Nativo)**: O isolamento multitenant de dados é forçado nativamente pelo PostgreSQL via RLS:
+  - Leituras (SELECT) validam se `contrato_id = (current_setting('request.jwt.claims', true)::jsonb ->> 'contrato_id')`.
+  - Mutações (INSERT, UPDATE, DELETE) validam adicionalmente se `(current_setting('request.jwt.claims', true)::jsonb ->> 'perfil') = 'ADMIN'`.
+- **Zero Trust**: Nenhuma informação de identificação (como `contrato_id` ou `empresa_id`) extraída do body ou query string autoriza operações de escrita/leitura.
 
 ---
 
 ## 2. Fluxo de Autenticação e Perfis de Usuários
 
-O sistema possui uma matriz granular de controle de acesso (RBAC) definida localmente na tabela `perfis_permissoes` do PostgreSQL, mapeada com base no papel (`perfil`) autenticado no IdP.
+O sistema possui uma matriz granular de controle de acesso (RBAC) definida localmente na tabela `perfis_permissoes` do PostgreSQL, mapeada com base no papel (`perfil`) atribuído ao usuário na tabela `usuarios`.
 
-### 2.1. Classificação de Perfis (Roles)
-- **ADMIN**: Acesso completo e irrestrito a configurações fiscais, cadastro de fornecedores, injeção de claims e parametrização de contratos.
-- **FINANCEIRO**: Permissão de leitura do DRE, faturamentos, processamento de notas fiscais e escrita/liquidação de lançamentos, sem acesso à gestão de claims.
+### 2.1. Administrador Principal
+- **E-mail do Administrador**: `sagacitas.sistemas@gmail.com`
+- **Perfil**: `ADMIN` associado ao tenant `CTR-2026-SYS`. Possui privilégios totais de leitura e mutação via RLS nas tabelas do sistema.
+
+### 2.2. Classificação de Perfis (Roles)
+- **ADMIN**: Acesso completo e irrestrito a configurações fiscais, cadastro e edição de fornecedores, parametrização de contratos e matriz de permissões.
+- **FINANCEIRO**: Permissão de leitura do DRE, faturamentos, processamento de notas fiscais e escrita/liquidação de lançamentos, sem autorização para modificação estrutural de fornecedores.
 - **GESTOR**: Acompanhamento físico-financeiro de trechos viários, visualização do DRE consolidado e aprovação de medições contratuais.
 - **FORNECEDOR**: Acesso limitado exclusivamente aos dados do seu próprio `empresa_id` (filtro estrito), visualizando apenas suas medições, alertas e notas sob faturamento.
 
@@ -39,10 +48,11 @@ O sistema possui uma matriz granular de controle de acesso (RBAC) definida local
 
 ## 3. Estrutura do Banco de Dados
 
-A infraestrutura e o negócio são divididos entre o Firestore (dados de onboarding, invites globais e estatísticas) e o PostgreSQL (negócio transacional).
+A infraestrutura e o negócio são divididos entre o Firestore (dados de onboarding e invites globais) e o PostgreSQL (negócio transacional e controle de acessos).
 
 ```mermaid
 erDiagram
+    usuarios }|--|| empresa_contratante : "pertence ao contrato"
     contratos ||--o{ empresas_fornecedores : "contém"
     contratos ||--o| empresa_contratante : "possui"
     contratos ||--o{ lancamentos_financeiros : "registra"
@@ -51,6 +61,17 @@ erDiagram
 ```
 
 ### 3.1. Dicionário de Tabelas / Coleções
+
+#### Tabela `usuarios` (PostgreSQL / Supabase)
+Cadastro central de usuários autorizados e atribuição de papéis no tenant.
+- `id` (UUID, PK): Identificador primário do registro.
+- `uid` (VARCHAR): ID único vindo do Firebase Auth / OAuth SSO.
+- `email` (VARCHAR, UNIQUE): E-mail do usuário utilizado para autorização via whitelist.
+- `nome` (VARCHAR): Nome completo do usuário.
+- `contrato_id` (VARCHAR): Código do tenant do usuário (`CTR-2026-SYS`).
+- `perfil` (VARCHAR): Papel no sistema (`ADMIN`, `GESTOR`, `FINANCEIRO`, `FORNECEDOR`).
+- `status` (VARCHAR): Estado da conta (`ATIVO`, `BLOQUEADO`, `INATIVO`).
+- `foto_url` (VARCHAR): URL da foto de perfil importada via SSO OAuth.
 
 #### Tabela `empresa_contratante` (PostgreSQL / Supabase)
 Cadastro das entidades contratantes detentoras do tenant principal.
@@ -69,9 +90,10 @@ Empresas homologadas, fornecedores ou subempreiteiras do ecossistema.
 - `nome` (VARCHAR): Nome empresarial ou fantasia.
 - `cnpj_cpf` (VARCHAR): CNPJ ou CPF do fornecedor.
 - `tipo` (VARCHAR): Categoria da empresa (`FORNECEDOR`, `CLIENTE`, `PARCEIRO`, `CONTRATANTE`).
-- `emailcontato` / `telefone` (VARCHAR): Dados do ponto de contato do fornecedor.
+- `email_contato` / `telefone` (VARCHAR): Dados do ponto de contato do fornecedor.
 - `status` (VARCHAR): Estado de homologação (`ATIVO`, `BLOQUEADO`, `EM_ANALISE`).
-- `totalfaturado` (NUMERIC): Valor monetário acumulado em medições aprovadas.
+- `total_faturado` (NUMERIC): Valor monetário acumulado em medições aprovadas.
+- `created_at` (TEXT/TIMESTAMP): Data de cadastro do fornecedor.
 
 #### Tabela `lancamentos_financeiros` (PostgreSQL / Supabase)
 Controle transacional de receitas e despesas vinculadas a contratos de obras.
@@ -110,7 +132,7 @@ Módulo de acompanhamento contábil estruturado em contas de resultado (Receita 
 Linha do tempo interativa e física-financeira de trechos viários e obras em andamento. Detalha cronograma planejado versus executado, marcos de conclusão de trechos físico-geográficos e desembolsos previstos indexados por fornecedor.
 
 ### 4.4. Homologação de Empresas (`EmpresasView`)
-Central de controle B2B para homologação, checagem cadastral, e auditoria documental de fornecedores e parceiros da cadeia produtiva.
+Central de controle B2B para homologação, checagem cadastral, e auditoria documental de fornecedores e parceiros da cadeia produtiva. Integração nativa com RLS para restrição de cadastros a perfis `ADMIN`.
 
 ### 4.5. Matriz de Acessos (`MatrizAcessosView`)
 Painel interativo que renderiza a matriz `perfis_permissoes` do banco PostgreSQL do tenant, permitindo a usuários `ADMIN` customizar as flags de autorização RBAC aplicadas a cada classe de perfil diretamente na UI.
