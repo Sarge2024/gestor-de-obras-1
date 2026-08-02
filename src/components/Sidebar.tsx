@@ -98,6 +98,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
 
           <button
+            onClick={() => handleNavClick('projetos_eap')}
+            className={`w-full text-left ${navItemClass('projetos_eap')}`}
+          >
+            <span
+              className="material-symbols-outlined"
+              style={{ fontVariationSettings: activeTab === 'projetos_eap' ? "'FILL' 1" : "'FILL' 0" }}
+            >
+              account_tree
+            </span>
+            <span className="font-label-bold text-label-bold">Projetos (EAP)</span>
+          </button>
+
+          <button
             onClick={() => handleNavClick('financeiro')}
             className={`w-full text-left ${navItemClass('financeiro')}`}
           >

@@ -160,3 +160,4 @@ GRANT ALL ON TABLE projetos TO postgres, anon, authenticated, service_role;
 GRANT ALL ON TABLE itens_eap TO postgres, anon, authenticated, service_role;
 GRANT ALL ON TABLE medicoes TO postgres, anon, authenticated, service_role;
 GRANT ALL ON TABLE itens_medicao_detalhe TO postgres, anon, authenticated, service_role;
+GRANT SELECT ON v_resumo_eap_medicao TO anon, authenticated, service_role;

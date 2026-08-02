@@ -32,6 +32,7 @@ import { AuthDebugView } from './components/AuthDebugView';
 import { DashboardView } from './components/DashboardView';
 import { FinanceiroView } from './components/FinanceiroView';
 import { ContratosView } from './components/ContratosView';
+import { ProjetosEapView } from './components/ProjetosEapView';
 import { AlertasView } from './components/AlertasView';
 import { EmpresasView } from './components/EmpresasView';
 import { EntidadesView } from './components/EntidadesView';
@@ -306,6 +307,10 @@ export default function App() {
               onUpdateContract={handleUpdateContract}
               onDeleteContract={handleDeleteContract}
             />
+          )}
+
+          {activeTab === 'projetos_eap' && (
+            <ProjetosEapView />
           )}
 
           {activeTab === 'alertas' && (
