@@ -87,10 +87,13 @@ try {
 
 if (!getAdminApps().length) {
   try {
-    initAdminApp({
-      projectId: configData.projectId
-    });
-    console.log("Firebase Admin initialized successfully.");
+    const hasCreds = !!process.env.GOOGLE_APPLICATION_CREDENTIALS || fs.existsSync(path.join(process.cwd(), "serviceAccountKey.json"));
+    if (hasCreds) {
+      initAdminApp({ projectId: configData.projectId });
+      console.log("Firebase Admin initialized successfully.");
+    } else {
+      console.warn("Skipping Firebase Admin init: No credentials found (prevents Vercel timeout).");
+    }
   } catch (err) {
     console.warn("Firebase Admin initialize warning:", err);
   }
